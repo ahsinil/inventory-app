@@ -1,0 +1,101 @@
+openapi: 3.0.3
+info:
+  title: Inventory Integration API
+  version: 1.0.0
+  description: |
+    API for external systems (Billing, FTTH, etc.).
+    Authenticate with `Authorization: Bearer <key_id>.<secret>` (service credential).
+    Every response carries `X-Request-ID` (send your own to correlate).
+    Mutating requests REQUIRE an `Idempotency-Key` header.
+servers:
+  - url: /api/v1
+security:
+  - serviceToken: []
+paths:
+  /external/stock:
+    get:
+      summary: Stock availability per product
+      description: Requires scope `stock:read`.
+      parameters:
+        - { name: warehouse_id, in: query, schema: { type: string } }
+        - { name: sku, in: query, schema: { type: string } }
+        - { name: per_page, in: query, schema: { type: integer, maximum: 200 } }
+      responses:
+        '200': { description: OK }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '429': { $ref: '#/components/responses/Error' }
+  /external/reservations:
+    post:
+      summary: Create and reserve stock
+      description: Requires scope `reservations:write`. One active reservation per (external_system, external_reference).
+      parameters:
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [external_system, external_reference, warehouse_id, items]
+              properties:
+                external_system: { type: string, example: billing }
+                external_reference: { type: string, example: INV-2026-0001 }
+                warehouse_id: { type: string }
+                expires_at: { type: string, format: date-time }
+                remarks: { type: string }
+                items:
+                  type: array
+                  items:
+                    type: object
+                    required: [product_id, quantity]
+                    properties:
+                      product_id: { type: string }
+                      quantity: { type: number }
+                      serial_numbers: { type: array, items: { type: string } }
+      responses:
+        '201': { description: Reserved }
+        '400': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
+  /external/reservations/{id}:
+    get:
+      summary: Get reservation
+      description: Requires scope `reservations:read`.
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: OK }
+        '404': { $ref: '#/components/responses/Error' }
+  /external/reservations/{id}/release:
+    post:
+      summary: Release a reservation
+      description: Requires scope `reservations:write`.
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      responses:
+        '200': { description: Released }
+        '422': { $ref: '#/components/responses/Error' }
+components:
+  securitySchemes:
+    serviceToken:
+      type: http
+      scheme: bearer
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema: { type: string, maxLength: 128 }
+  responses:
+    Error:
+      description: Error envelope
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              message: { type: string }
+              code: { type: string }
+              errors: { type: object }
