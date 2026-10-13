@@ -5,6 +5,8 @@ namespace Database\Seeders;
 use App\Models\Company;
 use App\Models\User;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 
 class DatabaseSeeder extends Seeder
 {
@@ -19,9 +21,12 @@ class DatabaseSeeder extends Seeder
             CatalogSeeder::class,
         ]);
 
-        $user = User::factory()->create([
+        $user = User::create([
             'name' => 'Super Admin',
             'email' => 'admin@example.com',
+            'email_verified_at' => now(),
+            'password' => Hash::make('password'),
+            'remember_token' => Str::random(10),
             'company_id' => Company::where('code', 'DEFAULT')->first()->id,
         ]);
 
