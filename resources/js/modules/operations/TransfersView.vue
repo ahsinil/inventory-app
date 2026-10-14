@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import axios from 'axios'
-import { Plus, Search, Ellipsis, ArrowRightLeft, Send, CheckCircle2 } from 'lucide-vue-next'
+import { Plus, Search, Ellipsis, ArrowRightLeft, Send, CheckCircle2, Trash2 } from 'lucide-vue-next'
 import DateRangePicker from '../../components/DateRangePicker.vue'
+import ProductCombobox from '../../components/forms/ProductCombobox.vue'
 
 interface Product { id: string; name: string; sku: string; has_serial_number: boolean; unit?: { code: string } }
 interface Warehouse { id: string; name: string; code: string }
@@ -157,11 +158,50 @@ const openCreate = () => {
   showCreateModal.value = true
 }
 const addCreateItem = () => { createForm.value.items.push({ product_id: '', requested_quantity: 1 }) }
-const removeCreateItem = (idx: number) => { createForm.value.items.splice(idx, 1) }
+const removeCreateItem = (idx: number) => { 
+  if (createForm.value.items.length > 1) {
+    createForm.value.items.splice(idx, 1) 
+  } else {
+    createForm.value.items[0] = { product_id: '', requested_quantity: 1 }
+  }
+}
 
 const submitCreate = async () => {
   saving.value = true
   createErrors.value = {}
+  if (!createForm.value.source_warehouse_id) {
+    createErrors.value.source_warehouse_id = ['Pilih gudang asal.']
+    saving.value = false
+    return
+  }
+  if (!createForm.value.destination_warehouse_id) {
+    createErrors.value.destination_warehouse_id = ['Pilih gudang tujuan.']
+    saving.value = false
+    return
+  }
+  if (createForm.value.source_warehouse_id === createForm.value.destination_warehouse_id) {
+    createErrors.value.destination_warehouse_id = ['Gudang tujuan tidak boleh sama dengan gudang asal.']
+    saving.value = false
+    return
+  }
+  if (createForm.value.items.length === 0) {
+    createErrors.value.items = ['Tambahkan minimal 1 barang.']
+    saving.value = false
+    return
+  }
+  const hasEmptyProduct = createForm.value.items.some(i => !i.product_id)
+  if (hasEmptyProduct) {
+    createErrors.value.items = ['Pastikan setiap baris telah memilih barang.']
+    saving.value = false
+    return
+  }
+  const hasInvalidQty = createForm.value.items.some(i => !i.requested_quantity || Number(i.requested_quantity) <= 0)
+  if (hasInvalidQty) {
+    createErrors.value.items = ['Jumlah Qty setiap barang harus lebih dari 0.']
+    saving.value = false
+    return
+  }
+
   try {
     await axios.post('/transfers', createForm.value)
     showCreateModal.value = false
@@ -362,7 +402,7 @@ onUnmounted(() => {
     <Teleport to="body">
       <Transition name="fade">
         <div v-if="showCreateModal" class="modal-backdrop" @click="showCreateModal = false">
-          <div class="modal-content" style="max-width: 550px;" @click.stop>
+          <div class="modal-content" style="max-width: 650px;" @click.stop>
             <div class="modal-header">
               <h2>Buat Transfer Antar Gudang</h2>
               <p>Rencanakan perpindahan stok ke gudang lain.</p>
@@ -389,27 +429,65 @@ onUnmounted(() => {
                 </div>
               </div>
 
-              <div class="form-group" style="margin-top: 10px;">
-                <label style="display: flex; justify-content: space-between; align-items: center;">
-                  <span>Daftar Barang <span class="req">*</span></span>
-                  <button type="button" @click="addCreateItem" style="background: none; border: 0; color: #6a5ce8; font-size: 10px; cursor: pointer; font-weight: 600;">+ Tambah Baris</button>
-                </label>
-                <div v-for="(item, idx) in createForm.items" :key="idx" style="display: flex; gap: 10px; margin-bottom: 10px;">
-                  <div style="flex: 2;">
-                    <select v-model="item.product_id" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #e9e7ef; font-size: 11px;">
-                      <option value="" disabled>Pilih Produk...</option>
-                      <option v-for="p in products" :key="p.id" :value="p.id">{{ p.name }}</option>
-                    </select>
+              <div class="form-group" style="margin-top: 6px;">
+                <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 8px;">
+                  <div>
+                    <label style="margin-bottom: 2px;">Daftar Barang Transfer <span class="req">*</span></label>
+                    <span style="font-size: 10px; color: #858291;">Ketik nama atau SKU untuk mencari barang</span>
                   </div>
-                  <div style="flex: 1; display: flex; align-items: center; gap: 8px;">
-                    <input v-model="item.requested_quantity" type="number" step="0.01" min="0" placeholder="Qty" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #e9e7ef; font-size: 11px;" />
-                    <span v-if="item.product_id" style="font-size: 10px; color: #858291; font-weight: 600; white-space: nowrap;">
-                      {{ products.find(p => p.id === item.product_id)?.unit?.code || 'pcs' }}
-                    </span>
-                  </div>
-                  <button type="button" @click="removeCreateItem(idx)" style="background: none; border: 0; color: #d47770; cursor: pointer;">✕</button>
+                  <button type="button" @click="addCreateItem" class="btn-add-item">
+                    <Plus :size="13" /> Tambah Baris
+                  </button>
                 </div>
-                <small v-if="createErrors.items" class="field-error">{{ createErrors.items[0] }}</small>
+
+                <div class="items-table-container">
+                  <div class="items-header-row">
+                    <span class="col-product">BARANG / PRODUK (KETIK NAMA ATAU SKU)</span>
+                    <span class="col-qty">QTY</span>
+                    <span class="col-action"></span>
+                  </div>
+
+                  <div
+                    v-for="(item, idx) in createForm.items"
+                    :key="idx"
+                    class="item-row"
+                  >
+                    <div class="col-product">
+                      <ProductCombobox
+                        v-model="item.product_id"
+                        :products="products"
+                        :error="!!createErrors[`items.${idx}.product_id`] || (!!createErrors.items && !item.product_id)"
+                        placeholder="Ketik nama produk atau SKU..."
+                      />
+                    </div>
+                    <div class="col-qty">
+                      <div class="qty-input-wrapper">
+                        <input
+                          v-model="item.requested_quantity"
+                          type="number"
+                          step="0.01"
+                          min="0.01"
+                          placeholder="0"
+                          class="qty-field"
+                        />
+                        <span class="qty-unit">
+                          {{ products.find(p => p.id === item.product_id)?.unit?.code || 'pcs' }}
+                        </span>
+                      </div>
+                    </div>
+                    <div class="col-action">
+                      <button
+                        type="button"
+                        class="btn-remove-row"
+                        title="Hapus baris"
+                        @click="removeCreateItem(idx)"
+                      >
+                        <Trash2 :size="13" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                <small v-if="createErrors.items" class="field-error" style="margin-top: 6px;">{{ createErrors.items[0] }}</small>
               </div>
 
               <div class="modal-footer">
@@ -522,4 +600,129 @@ onUnmounted(() => {
 .toast-notification.success { background: #292541; }
 .toast-notification.error { background: #d47770; }
 .toast-notification.warning { background: #c48735; }
+
+.btn-add-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: #f4f3fb;
+  border: 1px solid #e3e0f3;
+  color: #6a5ce8;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 5px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-add-item:hover {
+  background: #eceaf9;
+  border-color: #6a5ce8;
+}
+
+.items-table-container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: #fafafd;
+  border: 1px solid #eeedf3;
+  border-radius: 10px;
+  padding: 10px;
+}
+
+.items-header-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 4px 6px;
+  border-bottom: 1px solid #ecebf2;
+  font-size: 9px;
+  font-weight: 700;
+  color: #858291;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.item-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.col-product {
+  flex: 1;
+  min-width: 0;
+}
+
+.col-qty {
+  width: 110px;
+  flex-shrink: 0;
+}
+
+.col-action {
+  width: 28px;
+  flex-shrink: 0;
+  display: flex;
+  justify-content: center;
+}
+
+.qty-input-wrapper {
+  display: flex;
+  align-items: center;
+  background: #ffffff;
+  border: 1px solid #e9e7ef;
+  border-radius: 8px;
+  padding: 0 8px;
+  height: 38px;
+  transition: all 0.2s;
+  box-sizing: border-box;
+}
+
+.qty-input-wrapper:focus-within {
+  border-color: #bd3c3c;
+  box-shadow: 0 0 0 3px rgba(189, 60, 60, 0.1);
+}
+
+.qty-field {
+  width: 100%;
+  border: none !important;
+  outline: none !important;
+  background: transparent !important;
+  padding: 0 !important;
+  font-size: 12px !important;
+  color: #292541 !important;
+  font-weight: 600 !important;
+  text-align: right;
+  box-shadow: none !important;
+}
+
+.qty-unit {
+  font-size: 10px;
+  font-weight: 600;
+  color: #858291;
+  margin-left: 6px;
+  text-transform: uppercase;
+  user-select: none;
+}
+
+.btn-remove-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #c4c1cd;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.btn-remove-row:hover {
+  background: #fff2f2;
+  border-color: #f7d2d2;
+  color: #d47770;
+}
 </style>

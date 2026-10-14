@@ -4,6 +4,7 @@ import axios from 'axios'
 import { Html5Qrcode } from 'html5-qrcode'
 import { Ellipsis, Plus, Search, ShieldCheck, ChevronDown, X, ScanLine, AlertTriangle } from 'lucide-vue-next'
 import DateRangePicker from '../../components/DateRangePicker.vue'
+import ProductCombobox from '../../components/forms/ProductCombobox.vue'
 
 // --- Scanner kamera untuk Nomor Seri ---
 const showScanner = ref(false)
@@ -564,13 +565,12 @@ const formatDate = (d: string) => {
 
               <div class="form-group">
                 <label>Produk (Tipe Peralatan) <span class="req">*</span></label>
-                <div class="select-wrapper">
-                  <select v-model="form.product_id" :class="{ 'input-error': formErrors.product_id }">
-                    <option value="" disabled>Pilih Produk...</option>
-                    <option v-for="p in products" :key="p.id" :value="p.id">{{ p.name }} ({{ p.sku }})</option>
-                  </select>
-                  <ChevronDown :size="15" class="select-icon" />
-                </div>
+                <ProductCombobox
+                  v-model="form.product_id"
+                  :products="products"
+                  :error="!!formErrors.product_id"
+                  placeholder="Ketik nama produk atau SKU..."
+                />
                 <small v-if="formErrors.product_id" class="field-error">{{ formErrors.product_id[0] }}</small>
               </div>
               

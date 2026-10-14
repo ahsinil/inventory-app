@@ -3,6 +3,7 @@ import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import axios from 'axios'
 import { MoreHorizontal, Plus, Search, ChevronDown, AlertTriangle } from 'lucide-vue-next'
 import DateRangePicker from '../../components/DateRangePicker.vue'
+import ProductCombobox from '../../components/forms/ProductCombobox.vue'
 
 const reservations = ref<any[]>([])
 const warehouses = ref<any[]>([])
@@ -522,12 +523,14 @@ const formatDate = (d: string) => {
               <div class="form-group">
                 <label>Daftar Barang <span class="req">*</span></label>
                 <div style="display: flex; gap: 14px;">
-                  <div class="select-wrapper" style="flex: 1;">
-                    <select v-model="form.product_id" :disabled="!form.warehouse_id || fetchingProducts" :class="{ 'input-error': formErrors['items.0.product_id'] }">
-                      <option value="" disabled>{{ !form.warehouse_id ? 'Pilih gudang terlebih dahulu' : (fetchingProducts ? 'Memuat...' : (availableProducts.length === 0 ? 'Tidak ada stok di gudang ini' : 'Pilih Produk...')) }}</option>
-                      <option v-for="p in availableProducts" :key="p.id" :value="p.id">{{ p.name }} (Stok: {{ p.available_qty }})</option>
-                    </select>
-                    <ChevronDown :size="15" class="select-icon" />
+                  <div style="flex: 1;">
+                    <ProductCombobox
+                      v-model="form.product_id"
+                      :products="availableProducts"
+                      :disabled="!form.warehouse_id || fetchingProducts"
+                      :error="!!formErrors['items.0.product_id']"
+                      :placeholder="!form.warehouse_id ? 'Pilih gudang terlebih dahulu' : (fetchingProducts ? 'Memuat produk...' : (availableProducts.length === 0 ? 'Tidak ada stok di gudang ini' : 'Ketik nama barang atau SKU...'))"
+                    />
                   </div>
                   <div style="width: 130px; position: relative;">
                     <input v-model.number="form.quantity" type="number" min="0" step="any" placeholder="1" :class="{ 'input-error': formErrors['items.0.quantity'] }" :style="{ paddingRight: selectedProductUnit ? '46px' : '14px' }" />

@@ -3,6 +3,7 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import axios from 'axios'
 import { Plus, Search, Ellipsis, ArrowDownLeft, CheckCircle2, PackageCheck } from 'lucide-vue-next'
 import DateRangePicker from '../../components/DateRangePicker.vue'
+import ProductCombobox from '../../components/forms/ProductCombobox.vue'
 
 interface Product { id: string; name: string; sku: string; has_serial_number: boolean; unit?: { code: string } }
 interface Warehouse { id: string; name: string; code: string }
@@ -409,10 +410,11 @@ onUnmounted(() => {
                 
                 <div v-for="(item, idx) in createForm.items" :key="idx" style="display: flex; gap: 10px; margin-bottom: 10px; align-items: flex-start;">
                   <div style="flex: 1;">
-                    <select v-model="item.product_id" class="form-input">
-                      <option value="" disabled>Pilih Produk...</option>
-                      <option v-for="p in products" :key="p.id" :value="p.id">{{ p.name }} ({{ p.sku }})</option>
-                    </select>
+                    <ProductCombobox
+                      v-model="item.product_id"
+                      :products="products"
+                      placeholder="Ketik nama produk atau SKU..."
+                    />
                   </div>
                   <div style="width: 150px;">
                     <div style="display: flex; align-items: center; gap: 8px; background: #fafafd; border: 1px solid #e9e7ef; border-radius: 6px; padding: 0 10px;">

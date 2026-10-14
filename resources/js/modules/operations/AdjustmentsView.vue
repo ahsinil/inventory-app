@@ -3,6 +3,7 @@ import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import axios from 'axios'
 import { Plus, Search, Ellipsis, ClipboardCheck, CheckCircle2, X } from 'lucide-vue-next'
 import DateRangePicker from '../../components/DateRangePicker.vue'
+import ProductCombobox from '../../components/forms/ProductCombobox.vue'
 
 interface Product { id: string; name: string; sku: string; unit?: { code: string } }
 interface Warehouse { id: string; name: string; code: string }
@@ -393,10 +394,13 @@ onUnmounted(() => document.removeEventListener('click', closeDropdown))
 
                 <div v-for="(item, idx) in createForm.items" :key="idx" class="item-card">
                   <div class="item-top">
-                    <select v-model="item.product_id" class="grow">
-                      <option value="" disabled>Pilih Produk...</option>
-                      <option v-for="p in products" :key="p.id" :value="p.id">{{ p.name }}</option>
-                    </select>
+                    <div style="flex: 1;">
+                      <ProductCombobox
+                        v-model="item.product_id"
+                        :products="products"
+                        placeholder="Ketik nama produk atau SKU..."
+                      />
+                    </div>
                     <button type="button" class="rm-btn" aria-label="Hapus baris" @click="removeItem(idx)"><X :size="15" /></button>
                   </div>
                   <div class="item-bottom">
