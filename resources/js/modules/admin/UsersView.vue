@@ -16,6 +16,7 @@ import {
 } from 'lucide-vue-next'
 import axios from 'axios'
 import { useAuthStore } from '../../app/stores/auth'
+import AppSortableTh from '../../components/ui/AppSortableTh.vue'
 
 const authStore = useAuthStore()
 
@@ -39,6 +40,8 @@ const users = ref<UserItem[]>([])
 const roles = ref<RoleOption[]>([])
 const search = ref('')
 const filterRole = ref('')
+const sortBy = ref('')
+const sortDir = ref<'asc' | 'desc'>('asc')
 
 const showModal = ref(false)
 const isEditing = ref(false)
@@ -83,6 +86,10 @@ const fetchUsers = async () => {
     const params: Record<string, string> = {}
     if (search.value) params.search = search.value
     if (filterRole.value) params.role = filterRole.value
+    if (sortBy.value) {
+      params.sort_by = sortBy.value
+      params.sort_dir = sortDir.value
+    }
 
     const res = await axios.get('/users', { params })
     users.value = res.data.data.data || []
@@ -91,6 +98,12 @@ const fetchUsers = async () => {
   } finally {
     loading.value = false
   }
+}
+
+const handleSort = (field: string, dir: 'asc' | 'desc') => {
+  sortBy.value = field
+  sortDir.value = dir
+  fetchUsers()
 }
 
 const openAddModal = () => {
@@ -283,11 +296,11 @@ onMounted(() => {
         <table>
           <thead>
             <tr>
-              <th>Pengguna</th>
-              <th>Email</th>
-              <th>Peran / Hak Akses</th>
-              <th>Tanggal Terdaftar</th>
-              <th style="text-align: right;">Aksi</th>
+              <AppSortableTh field="name" :current-sort="sortBy" :current-dir="sortDir" @sort="handleSort">Pengguna</AppSortableTh>
+              <AppSortableTh field="email" :current-sort="sortBy" :current-dir="sortDir" @sort="handleSort">Email</AppSortableTh>
+              <th style="padding: 10px 19px; text-align: left; color: #aaa7b4; font-size: 9px; font-weight: 600; text-transform: uppercase; background: #fafafd; border-top: 1px solid #f0eff3; border-bottom: 1px solid #f0eff3;">Peran / Hak Akses</th>
+              <AppSortableTh field="created_at" :current-sort="sortBy" :current-dir="sortDir" @sort="handleSort">Tanggal Terdaftar</AppSortableTh>
+              <th style="padding: 10px 19px; text-align: right; color: #aaa7b4; font-size: 9px; font-weight: 600; text-transform: uppercase; background: #fafafd; border-top: 1px solid #f0eff3; border-bottom: 1px solid #f0eff3;">Aksi</th>
             </tr>
           </thead>
           <tbody>

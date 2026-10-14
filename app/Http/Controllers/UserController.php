@@ -26,8 +26,16 @@ class UserController extends Controller
             })
             ->when($request->role, function ($q, $role) {
                 $q->whereHas('roles', fn ($sq) => $sq->where('name', $role));
-            })
-            ->latest();
+            });
+
+        $sortBy = $request->input('sort_by');
+        $sortDir = strtolower($request->input('sort_dir', 'asc')) === 'desc' ? 'desc' : 'asc';
+
+        if (in_array($sortBy, ['name', 'email', 'created_at'], true)) {
+            $query->orderBy($sortBy, $sortDir);
+        } else {
+            $query->latest();
+        }
 
         return $this->successResponse($query->paginate(20));
     }

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Actions\Inventory\ProcessReturnAction;
 use App\Models\Company;
 use App\Models\StockReturn;
+use App\Models\Warehouse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -12,7 +13,7 @@ class StockReturnController extends Controller
 {
     public function index(Request $request)
     {
-        $query = StockReturn::with(['items.product.unit', 'warehouse'])->latest();
+        $query = StockReturn::with(['items.product.unit', 'warehouse']);
         if ($search = $request->query('search')) {
             $query->where(function ($q) use ($search) {
                 $q->where('return_number', 'like', "%{$search}%")
@@ -28,6 +29,21 @@ class StockReturnController extends Controller
         if ($endDate = $request->query('end_date')) {
             $query->whereDate('created_at', '<=', $endDate);
         }
+
+        $sortBy = $request->input('sort_by');
+        $sortDir = strtolower($request->input('sort_dir', 'asc')) === 'desc' ? 'desc' : 'asc';
+
+        if ($sortBy === 'warehouse') {
+            $query->orderBy(
+                Warehouse::select('name')->whereColumn('warehouses.id', 'stock_returns.warehouse_id'),
+                $sortDir
+            );
+        } elseif (in_array($sortBy, ['return_number', 'type', 'status', 'created_at'], true)) {
+            $query->orderBy($sortBy, $sortDir);
+        } else {
+            $query->latest();
+        }
+
         $returns = $query->paginate();
 
         return $this->successResponse($returns);

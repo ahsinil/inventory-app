@@ -4,18 +4,20 @@ namespace App\Http\Controllers;
 
 use App\Models\Company;
 use App\Models\InventoryAsset;
+use App\Models\Product;
 use Illuminate\Http\Request;
 
 class InventoryAssetController extends Controller
 {
     public function index(Request $request)
     {
-        $query = InventoryAsset::with(['product.unit', 'warehouseLocation.warehouse'])
-            ->latest();
+        $query = InventoryAsset::with(['product.unit', 'warehouseLocation.warehouse']);
 
         if ($search = $request->query('search')) {
             $query->where(function ($q) use ($search) {
                 $q->where('serial_number', 'like', "%{$search}%")
+                    ->orWhere('asset_tag', 'like', "%{$search}%")
+                    ->orWhere('name', 'like', "%{$search}%")
                     ->orWhereHas('product', function ($p) use ($search) {
                         $p->where('name', 'like', "%{$search}%")
                             ->orWhere('sku', 'like', "%{$search}%");
@@ -39,6 +41,20 @@ class InventoryAssetController extends Controller
         }
         if ($endDate = $request->query('end_date')) {
             $query->whereDate('updated_at', '<=', $endDate);
+        }
+
+        $sortBy = $request->input('sort_by');
+        $sortDir = strtolower($request->input('sort_dir', 'asc')) === 'desc' ? 'desc' : 'asc';
+
+        if ($sortBy === 'product') {
+            $query->orderBy(
+                Product::select('name')->whereColumn('products.id', 'inventory_assets.product_id'),
+                $sortDir
+            );
+        } elseif (in_array($sortBy, ['asset_tag', 'name', 'serial_number', 'status', 'created_at', 'updated_at'], true)) {
+            $query->orderBy($sortBy, $sortDir);
+        } else {
+            $query->latest();
         }
 
         $assets = $query->paginate($request->query('per_page', 15));

@@ -6,6 +6,7 @@ use App\Actions\Inventory\ReceiveTransferAction;
 use App\Actions\Inventory\ShipTransferAction;
 use App\Models\Company;
 use App\Models\StockTransfer;
+use App\Models\Warehouse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -13,8 +14,7 @@ class StockTransferController extends Controller
 {
     public function index(Request $request)
     {
-        $query = StockTransfer::with(['sourceWarehouse', 'destinationWarehouse', 'items.product.unit'])
-            ->latest();
+        $query = StockTransfer::with(['sourceWarehouse', 'destinationWarehouse', 'items.product.unit']);
 
         if ($search = $request->query('search')) {
             $query->where(function ($q) use ($search) {
@@ -33,6 +33,25 @@ class StockTransferController extends Controller
         }
         if ($endDate = $request->query('end_date')) {
             $query->whereDate('created_at', '<=', $endDate);
+        }
+
+        $sortBy = $request->input('sort_by');
+        $sortDir = strtolower($request->input('sort_dir', 'asc')) === 'desc' ? 'desc' : 'asc';
+
+        if ($sortBy === 'source_warehouse') {
+            $query->orderBy(
+                Warehouse::select('name')->whereColumn('warehouses.id', 'stock_transfers.source_warehouse_id'),
+                $sortDir
+            );
+        } elseif ($sortBy === 'destination_warehouse') {
+            $query->orderBy(
+                Warehouse::select('name')->whereColumn('warehouses.id', 'stock_transfers.destination_warehouse_id'),
+                $sortDir
+            );
+        } elseif (in_array($sortBy, ['transfer_number', 'status', 'created_at', 'expected_date'], true)) {
+            $query->orderBy($sortBy, $sortDir);
+        } else {
+            $query->latest();
         }
 
         $transfers = $query->paginate();

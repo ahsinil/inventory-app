@@ -3,6 +3,8 @@ import { ref, computed, onMounted } from 'vue'
 import axios from 'axios'
 import { ArrowDownToLine, ArrowUpRight, ArrowLeftRight, Download, Filter, Search } from 'lucide-vue-next'
 import DateRangePicker from '../../components/DateRangePicker.vue'
+import AppPagination from '../../components/ui/AppPagination.vue'
+import AppSortableTh from '../../components/ui/AppSortableTh.vue'
 
 const movements = ref<any[]>([])
 const warehouses = ref<any[]>([])
@@ -18,6 +20,8 @@ const activeWarehouse = ref('')
 const activeCategory = ref('')
 const dateFrom = ref('')
 const dateTo = ref('')
+const sortBy = ref('')
+const sortDir = ref<'asc' | 'desc'>('desc')
 const stats = ref({
   total_in: 0,
   total_out: 0,
@@ -52,7 +56,9 @@ const fetchMovements = async () => {
     warehouse_id: activeWarehouse.value || undefined,
     category_id: activeCategory.value || undefined,
     start_date: dateFrom.value || undefined,
-    end_date: dateTo.value || undefined
+    end_date: dateTo.value || undefined,
+    sort_by: sortBy.value || undefined,
+    sort_dir: sortBy.value ? sortDir.value : undefined
   }
 
   try {
@@ -72,6 +78,13 @@ const fetchMovements = async () => {
   } finally {
     loading.value = false
   }
+}
+
+const handleSort = (field: string, dir: 'asc' | 'desc') => {
+  sortBy.value = field
+  sortDir.value = dir
+  page.value = 1
+  fetchMovements()
 }
 
 const exportCSV = () => {
@@ -206,7 +219,15 @@ onMounted(() => {
       <div class="table-scroll">
         <table class="movement-table">
           <thead>
-            <tr><th>ID Pergerakan</th><th>Tipe</th><th>Produk</th><th>Gudang / Rak</th><th>Kuantitas</th><th>Dilakukan oleh</th><th>Tanggal & waktu</th></tr>
+            <tr>
+              <th style="padding: 10px 19px; text-align: left; color: #aaa7b4; font-size: 9px; font-weight: 600; text-transform: uppercase; background: #fafafd; border-top: 1px solid #f0eff3; border-bottom: 1px solid #f0eff3;">ID Pergerakan</th>
+              <AppSortableTh field="type" :current-sort="sortBy" :current-dir="sortDir" @sort="handleSort">Tipe</AppSortableTh>
+              <th style="padding: 10px 19px; text-align: left; color: #aaa7b4; font-size: 9px; font-weight: 600; text-transform: uppercase; background: #fafafd; border-top: 1px solid #f0eff3; border-bottom: 1px solid #f0eff3;">Produk</th>
+              <th style="padding: 10px 19px; text-align: left; color: #aaa7b4; font-size: 9px; font-weight: 600; text-transform: uppercase; background: #fafafd; border-top: 1px solid #f0eff3; border-bottom: 1px solid #f0eff3;">Gudang / Rak</th>
+              <AppSortableTh field="quantity" :current-sort="sortBy" :current-dir="sortDir" @sort="handleSort">Kuantitas</AppSortableTh>
+              <th style="padding: 10px 19px; text-align: left; color: #aaa7b4; font-size: 9px; font-weight: 600; text-transform: uppercase; background: #fafafd; border-top: 1px solid #f0eff3; border-bottom: 1px solid #f0eff3;">Dilakukan oleh</th>
+              <AppSortableTh field="created_at" :current-sort="sortBy" :current-dir="sortDir" @sort="handleSort">Tanggal & waktu</AppSortableTh>
+            </tr>
           </thead>
           <tbody>
             <tr v-if="loading && !movements.length"><td colspan="7" style="text-align:center; padding: 20px;">Memuat data...</td></tr>
@@ -237,14 +258,18 @@ onMounted(() => {
           </tbody>
         </table>
       </div>
-      <div class="table-footer">
-        <span>Menampilkan {{ fromItem }}–{{ toItem }} dari {{ total }} pergerakan</span>
-        <div style="display: flex; gap: 4px;">
-          <button :disabled="page <= 1" @click="goTo(page - 1)">Sebelumnya</button>
-          <button v-for="n in pages" :key="n" :class="{ 'current-page': n === page }" @click="goTo(n)">{{ n }}</button>
-          <button :disabled="page >= lastPage" @click="goTo(page + 1)">Berikutnya</button>
-        </div>
-      </div>
+      <AppPagination
+        :page="page"
+        :last-page="lastPage"
+        :total="total"
+        :from="fromItem"
+        :to="toItem"
+        @change="goTo"
+      >
+        <template #info>
+          <span>Menampilkan {{ fromItem }}–{{ toItem }} dari {{ total }} pergerakan</span>
+        </template>
+      </AppPagination>
     </div>
     <Teleport to="body">
       <Transition name="fade">

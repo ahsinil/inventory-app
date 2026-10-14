@@ -61,8 +61,16 @@ class ReportController extends Controller
             ->when($request->search, function ($q, $search) {
                 $q->whereHas('product', fn ($q) => $q->where('name', 'like', "%{$search}%")->orWhere('sku', 'like', "%{$search}%"))
                     ->orWhere('id', 'like', "%{$search}%");
-            })
-            ->latest();
+            });
+
+        $sortBy = $request->input('sort_by');
+        $sortDir = strtolower($request->input('sort_dir', 'desc')) === 'asc' ? 'asc' : 'desc';
+
+        if (in_array($sortBy, ['created_at', 'quantity', 'type'], true)) {
+            $query->orderBy($sortBy, $sortDir);
+        } else {
+            $query->latest();
+        }
 
         if ($request->export) {
             $reportId = (string) Str::ulid();

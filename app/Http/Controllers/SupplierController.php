@@ -11,16 +11,25 @@ class SupplierController extends Controller
 {
     public function index(Request $request)
     {
-        $suppliers = Supplier::query()
+        $query = Supplier::query()
             ->when($request->filled('search'), function ($q) use ($request) {
                 $s = '%'.$request->input('search').'%';
                 $q->where(fn ($q) => $q->where('name', 'like', $s)
                     ->orWhere('code', 'like', $s)
                     ->orWhere('email', 'like', $s)
                     ->orWhere('phone', 'like', $s));
-            })
-            ->orderBy('name')
-            ->paginate($request->integer('per_page', 15));
+            });
+
+        $sortBy = $request->input('sort_by');
+        $sortDir = strtolower($request->input('sort_dir', 'asc')) === 'desc' ? 'desc' : 'asc';
+
+        if (in_array($sortBy, ['name', 'code', 'contact_name', 'email', 'phone', 'city', 'created_at'], true)) {
+            $query->orderBy($sortBy, $sortDir);
+        } else {
+            $query->orderBy('name');
+        }
+
+        $suppliers = $query->paginate($request->integer('per_page', 15));
 
         return $this->successResponse($suppliers);
     }

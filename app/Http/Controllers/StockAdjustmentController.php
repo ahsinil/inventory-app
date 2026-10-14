@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Actions\Inventory\AdjustStockAction;
 use App\Models\Company;
 use App\Models\StockAdjustment;
+use App\Models\Warehouse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -12,7 +13,7 @@ class StockAdjustmentController extends Controller
 {
     public function index(Request $request)
     {
-        $query = StockAdjustment::with(['items.product.unit', 'items.warehouseLocation', 'warehouse'])->latest();
+        $query = StockAdjustment::with(['items.product.unit', 'items.warehouseLocation', 'warehouse']);
         if ($search = $request->query('search')) {
             $query->where(function ($q) use ($search) {
                 $q->where('adjustment_number', 'like', "%{$search}%")
@@ -27,6 +28,21 @@ class StockAdjustmentController extends Controller
         if ($endDate = $request->query('end_date')) {
             $query->whereDate('created_at', '<=', $endDate);
         }
+
+        $sortBy = $request->input('sort_by');
+        $sortDir = strtolower($request->input('sort_dir', 'asc')) === 'desc' ? 'desc' : 'asc';
+
+        if ($sortBy === 'warehouse') {
+            $query->orderBy(
+                Warehouse::select('name')->whereColumn('warehouses.id', 'stock_adjustments.warehouse_id'),
+                $sortDir
+            );
+        } elseif (in_array($sortBy, ['adjustment_number', 'type', 'status', 'created_at'], true)) {
+            $query->orderBy($sortBy, $sortDir);
+        } else {
+            $query->latest();
+        }
+
         $adjustments = $query->paginate();
 
         return $this->successResponse($adjustments);

@@ -2,6 +2,8 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import axios from 'axios'
 import { Plus, Search, Ellipsis, AlertTriangle, Truck, MapPin, Mail, Phone } from 'lucide-vue-next'
+import AppPagination from '../../components/ui/AppPagination.vue'
+import AppSortableTh from '../../components/ui/AppSortableTh.vue'
 
 interface Supplier {
   id: string
@@ -17,25 +19,45 @@ const suppliers = ref<Supplier[]>([])
 const loading = ref(false)
 const errorMessage = ref('')
 const search = ref('')
+const sortBy = ref('')
+const sortDir = ref<'asc' | 'desc'>('asc')
 const page = ref(1)
 const lastPage = ref(1)
 const total = ref(0)
+const from = ref(0)
+const to = ref(0)
 let searchTimer: ReturnType<typeof setTimeout> | null = null
 
 const fetchSuppliers = async () => {
   loading.value = true
   errorMessage.value = ''
   try {
-    const res = await axios.get('/suppliers', { params: { search: search.value || undefined, page: page.value } })
+    const res = await axios.get('/suppliers', { 
+      params: { 
+        search: search.value || undefined, 
+        page: page.value,
+        sort_by: sortBy.value || undefined,
+        sort_dir: sortBy.value ? sortDir.value : undefined
+      } 
+    })
     const data = res.data.data
     suppliers.value = data.data
     lastPage.value = data.last_page
     total.value = data.total
+    from.value = data.from ?? 0
+    to.value = data.to ?? 0
   } catch (e: any) {
     errorMessage.value = e.response?.data?.message || 'Gagal memuat data pemasok.'
   } finally {
     loading.value = false
   }
+}
+
+const handleSort = (field: string, dir: 'asc' | 'desc') => {
+  sortBy.value = field
+  sortDir.value = dir
+  page.value = 1
+  fetchSuppliers()
 }
 
 const onSearch = () => {
@@ -181,8 +203,8 @@ onUnmounted(() => {
         <table class="modern-table" style="width: 100%; min-width: 900px; border-collapse: collapse; font-size: 11px;">
           <thead>
             <tr>
-              <th style="padding: 10px 19px; text-align: left; color: #aaa7b4; font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; background: #fafafd; border-top: 1px solid #f0eff3; border-bottom: 1px solid #f0eff3;">Pemasok</th>
-              <th style="padding: 10px 19px; text-align: left; color: #aaa7b4; font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; background: #fafafd; border-top: 1px solid #f0eff3; border-bottom: 1px solid #f0eff3;">Kontak</th>
+              <AppSortableTh field="name" :current-sort="sortBy" :current-dir="sortDir" @sort="handleSort">Pemasok</AppSortableTh>
+              <AppSortableTh field="email" :current-sort="sortBy" :current-dir="sortDir" @sort="handleSort">Kontak</AppSortableTh>
               <th style="padding: 10px 19px; text-align: left; color: #aaa7b4; font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; background: #fafafd; border-top: 1px solid #f0eff3; border-bottom: 1px solid #f0eff3;">Alamat</th>
               <th style="padding: 10px 19px; text-align: left; color: #aaa7b4; font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; background: #fafafd; border-top: 1px solid #f0eff3; border-bottom: 1px solid #f0eff3;">Status</th>
               <th style="padding: 10px 19px; text-align: left; color: #aaa7b4; font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; background: #fafafd; border-top: 1px solid #f0eff3; border-bottom: 1px solid #f0eff3;"></th>
@@ -229,13 +251,18 @@ onUnmounted(() => {
           </tbody>
         </table>
       </div>
-      <div v-if="lastPage > 1" style="display: flex; justify-content: space-between; align-items: center; padding: 14px 19px; border-top: 1px solid #f0eff3;">
-        <span style="color: #aaa7b4; font-size: 10px;">Total {{ total }} pemasok</span>
-        <div style="display: flex; gap: 4px;">
-          <button :disabled="page === 1" @click="goTo(page - 1)" style="padding: 6px 10px; border-radius: 6px; border: 1px solid #eeedf3; background: #fff; color: #48445c; font-size: 11px; cursor: pointer;" :style="page === 1 ? 'opacity: 0.5; cursor: not-allowed;' : ''">Prev</button>
-          <button :disabled="page === lastPage" @click="goTo(page + 1)" style="padding: 6px 10px; border-radius: 6px; border: 1px solid #eeedf3; background: #fff; color: #48445c; font-size: 11px; cursor: pointer;" :style="page === lastPage ? 'opacity: 0.5; cursor: not-allowed;' : ''">Next</button>
-        </div>
-      </div>
+      <AppPagination
+        :page="page"
+        :last-page="lastPage"
+        :total="total"
+        :from="from"
+        :to="to"
+        @change="goTo"
+      >
+        <template #info>
+          <span>Menampilkan {{ from }}–{{ to }} dari {{ total }} pemasok</span>
+        </template>
+      </AppPagination>
     </div>
 
     <Teleport to="body">

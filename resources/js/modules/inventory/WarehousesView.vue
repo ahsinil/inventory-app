@@ -2,6 +2,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import axios from 'axios'
 import { MapPin, Plus, Search, Warehouse as WarehouseIcon, Ellipsis, AlertTriangle, X } from 'lucide-vue-next'
+import AppSortableTh from '../../components/ui/AppSortableTh.vue'
 
 defineProps<{ title: string }>()
 
@@ -41,6 +42,31 @@ const totalCount = computed(() => warehouses.value.length)
 const activeCount = computed(() => warehouses.value.filter(w => w.is_active).length)
 const totalLocations = computed(() => warehouses.value.reduce((s, w) => s + w.locations_count, 0))
 const totalStock = computed(() => warehouses.value.reduce((s, w) => s + w.total_stock, 0))
+
+const sortBy = ref('')
+const sortDir = ref<'asc' | 'desc'>('asc')
+
+const handleSort = (field: string, dir: 'asc' | 'desc') => {
+  sortBy.value = field
+  sortDir.value = dir
+}
+
+const sortedWarehouses = computed(() => {
+  if (!sortBy.value) return warehouses.value
+  const list = [...warehouses.value]
+  const field = sortBy.value
+  const dir = sortDir.value === 'asc' ? 1 : -1
+
+  return list.sort((a, b) => {
+    let valA: any = a[field as keyof WarehouseItem] ?? ''
+    let valB: any = b[field as keyof WarehouseItem] ?? ''
+    if (typeof valA === 'string') valA = valA.toLowerCase()
+    if (typeof valB === 'string') valB = valB.toLowerCase()
+    if (valA < valB) return -1 * dir
+    if (valA > valB) return 1 * dir
+    return 0
+  })
+})
 
 const fetchWarehouses = async () => {
   loading.value = true
@@ -315,9 +341,18 @@ onUnmounted(() => {
 
       <div v-if="warehouses.length" class="table-scroll">
         <table class="warehouses-table">
-          <thead><tr><th>Gudang</th><th>Alamat</th><th>Lokasi</th><th>Stok</th><th>Status</th><th></th></tr></thead>
+          <thead>
+            <tr>
+              <AppSortableTh field="name" :current-sort="sortBy" :current-dir="sortDir" @sort="handleSort">Gudang</AppSortableTh>
+              <AppSortableTh field="address" :current-sort="sortBy" :current-dir="sortDir" @sort="handleSort">Alamat</AppSortableTh>
+              <AppSortableTh field="locations_count" :current-sort="sortBy" :current-dir="sortDir" @sort="handleSort">Lokasi</AppSortableTh>
+              <AppSortableTh field="total_stock" :current-sort="sortBy" :current-dir="sortDir" @sort="handleSort">Stok</AppSortableTh>
+              <AppSortableTh field="is_active" :current-sort="sortBy" :current-dir="sortDir" @sort="handleSort">Status</AppSortableTh>
+              <th style="padding: 10px 19px; background: #fafafd; border-top: 1px solid #f0eff3; border-bottom: 1px solid #f0eff3; width: 40px;"></th>
+            </tr>
+          </thead>
           <tbody>
-            <tr v-for="item in warehouses" :key="item.id">
+            <tr v-for="item in sortedWarehouses" :key="item.id">
               <td>
                 <div class="warehouse-name">
                   <div class="warehouse-icon"><WarehouseIcon :size="15" /></div>

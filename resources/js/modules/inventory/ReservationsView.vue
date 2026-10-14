@@ -4,6 +4,8 @@ import axios from 'axios'
 import { MoreHorizontal, Plus, Search, ChevronDown, AlertTriangle } from 'lucide-vue-next'
 import DateRangePicker from '../../components/DateRangePicker.vue'
 import ProductCombobox from '../../components/forms/ProductCombobox.vue'
+import AppPagination from '../../components/ui/AppPagination.vue'
+import AppSortableTh from '../../components/ui/AppSortableTh.vue'
 
 const reservations = ref<any[]>([])
 const warehouses = ref<any[]>([])
@@ -18,6 +20,8 @@ const activeWarehouse = ref('')
 const activeStatus = ref('')
 const dateFrom = ref('')
 const dateTo = ref('')
+const sortBy = ref('')
+const sortDir = ref<'asc' | 'desc'>('desc')
 
 const showAddModal = ref(false)
 const saving = ref(false)
@@ -92,7 +96,9 @@ const fetchReservations = async () => {
     status: activeStatus.value || undefined,
     warehouse_id: activeWarehouse.value || undefined,
     start_date: dateFrom.value || undefined,
-    end_date: dateTo.value || undefined
+    end_date: dateTo.value || undefined,
+    sort_by: sortBy.value || undefined,
+    sort_dir: sortBy.value ? sortDir.value : undefined
   }
 
   try {
@@ -112,6 +118,13 @@ const fetchReservations = async () => {
   } finally {
     loading.value = false
   }
+}
+
+const handleSort = (field: string, dir: 'asc' | 'desc') => {
+  sortBy.value = field
+  sortDir.value = dir
+  page.value = 1
+  fetchReservations()
 }
 
 const fetchInitialData = async () => {
@@ -426,14 +439,14 @@ const formatDate = (d: string) => {
         <table class="reservations-table">
           <thead>
             <tr>
-              <th>Reservasi</th>
-              <th>Produk</th>
-              <th>Gudang</th>
-              <th>Kuantitas</th>
-              <th>Diminta oleh</th>
-              <th>Tanggal</th>
-              <th>Status</th>
-              <th></th>
+              <AppSortableTh field="reservation_number" :current-sort="sortBy" :current-dir="sortDir" @sort="handleSort">Reservasi</AppSortableTh>
+              <th style="padding: 10px 19px; text-align: left; color: #aaa7b4; font-size: 9px; font-weight: 600; text-transform: uppercase; background: #fafafd; border-top: 1px solid #f0eff3; border-bottom: 1px solid #f0eff3;">Produk</th>
+              <AppSortableTh field="warehouse" :current-sort="sortBy" :current-dir="sortDir" @sort="handleSort">Gudang</AppSortableTh>
+              <th style="padding: 10px 19px; text-align: left; color: #aaa7b4; font-size: 9px; font-weight: 600; text-transform: uppercase; background: #fafafd; border-top: 1px solid #f0eff3; border-bottom: 1px solid #f0eff3;">Kuantitas</th>
+              <th style="padding: 10px 19px; text-align: left; color: #aaa7b4; font-size: 9px; font-weight: 600; text-transform: uppercase; background: #fafafd; border-top: 1px solid #f0eff3; border-bottom: 1px solid #f0eff3;">Diminta oleh</th>
+              <AppSortableTh field="created_at" :current-sort="sortBy" :current-dir="sortDir" @sort="handleSort">Tanggal</AppSortableTh>
+              <AppSortableTh field="status" :current-sort="sortBy" :current-dir="sortDir" @sort="handleSort">Status</AppSortableTh>
+              <th style="padding: 10px 19px; background: #fafafd; border-top: 1px solid #f0eff3; border-bottom: 1px solid #f0eff3; width: 40px;"></th>
             </tr>
           </thead>
           <tbody>
@@ -482,14 +495,18 @@ const formatDate = (d: string) => {
         </table>
       </div>
       
-      <div class="products-pagination">
-        <span>Menampilkan {{ from }}–{{ to }} dari {{ total }} reservasi</span>
-        <div>
-          <button class="pagination-button" :disabled="page <= 1" @click="goTo(page - 1)">Sebelumnya</button>
-          <button class="pagination-button" v-for="n in pages" :key="n" :class="{ 'active': n === page }" @click="goTo(n)">{{ n }}</button>
-          <button class="pagination-button" :disabled="page >= lastPage" @click="goTo(page + 1)">Berikutnya</button>
-        </div>
-      </div>
+      <AppPagination
+        :page="page"
+        :last-page="lastPage"
+        :total="total"
+        :from="from"
+        :to="to"
+        @change="goTo"
+      >
+        <template #info>
+          <span>Menampilkan {{ from }}–{{ to }} dari {{ total }} reservasi</span>
+        </template>
+      </AppPagination>
     </div>
     
     <Teleport to="body">

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Actions\Inventory\FulfillReservationAction;
 use App\Models\Company;
 use App\Models\StockReservation;
+use App\Models\Warehouse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -12,8 +13,7 @@ class StockReservationController extends Controller
 {
     public function index(Request $request)
     {
-        $query = StockReservation::with(['warehouse', 'items.product.unit'])
-            ->latest();
+        $query = StockReservation::with(['warehouse', 'items.product.unit']);
 
         if ($search = $request->query('search')) {
             $query->where(function ($q) use ($search) {
@@ -42,6 +42,20 @@ class StockReservationController extends Controller
         }
         if ($endDate = $request->query('end_date')) {
             $query->whereDate('created_at', '<=', $endDate);
+        }
+
+        $sortBy = $request->input('sort_by');
+        $sortDir = strtolower($request->input('sort_dir', 'asc')) === 'desc' ? 'desc' : 'asc';
+
+        if ($sortBy === 'warehouse') {
+            $query->orderBy(
+                Warehouse::select('name')->whereColumn('warehouses.id', 'stock_reservations.warehouse_id'),
+                $sortDir
+            );
+        } elseif (in_array($sortBy, ['reservation_number', 'status', 'created_at', 'expires_at'], true)) {
+            $query->orderBy($sortBy, $sortDir);
+        } else {
+            $query->latest();
         }
 
         $reservations = $query->paginate($request->query('per_page', 15));

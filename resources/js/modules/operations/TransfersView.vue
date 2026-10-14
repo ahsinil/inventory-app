@@ -4,6 +4,8 @@ import axios from 'axios'
 import { Plus, Search, Ellipsis, ArrowRightLeft, Send, CheckCircle2, Trash2 } from 'lucide-vue-next'
 import DateRangePicker from '../../components/DateRangePicker.vue'
 import ProductCombobox from '../../components/forms/ProductCombobox.vue'
+import AppPagination from '../../components/ui/AppPagination.vue'
+import AppSortableTh from '../../components/ui/AppSortableTh.vue'
 
 interface Product { id: string; name: string; sku: string; has_serial_number: boolean; unit?: { code: string } }
 interface Warehouse { id: string; name: string; code: string }
@@ -41,6 +43,8 @@ const fromItem = ref(0)
 const toItem = ref(0)
 const dateFrom = ref('')
 const dateTo = ref('')
+const sortBy = ref('')
+const sortDir = ref<'asc' | 'desc'>('asc')
 let searchTimer: ReturnType<typeof setTimeout> | null = null
 
 const toastMessage = ref('')
@@ -84,7 +88,9 @@ const fetchTransfers = async () => {
         page: page.value,
         search: search.value || undefined,
         start_date: dateFrom.value || undefined,
-        end_date: dateTo.value || undefined
+        end_date: dateTo.value || undefined,
+        sort_by: sortBy.value || undefined,
+        sort_dir: sortBy.value ? sortDir.value : undefined
       } 
     })
     const data = res.data.data
@@ -98,6 +104,13 @@ const fetchTransfers = async () => {
   } finally {
     loading.value = false
   }
+}
+
+const handleSort = (field: string, dir: 'asc' | 'desc') => {
+  sortBy.value = field
+  sortDir.value = dir
+  page.value = 1
+  fetchTransfers()
 }
 
 const exportCSV = () => {
@@ -346,11 +359,11 @@ onUnmounted(() => {
         <table class="modern-table" style="width: 100%; min-width: 900px; border-collapse: collapse; font-size: 11px;">
           <thead>
             <tr>
-              <th style="padding: 10px 19px; text-align: left; color: #aaa7b4; font-size: 9px; font-weight: 600; text-transform: uppercase; background: #fafafd; border-y: 1px solid #f0eff3;">Nomor / Tgl</th>
-              <th style="padding: 10px 19px; text-align: left; color: #aaa7b4; font-size: 9px; font-weight: 600; text-transform: uppercase; background: #fafafd; border-y: 1px solid #f0eff3;">Asal (Sumber)</th>
-              <th style="padding: 10px 19px; text-align: left; color: #aaa7b4; font-size: 9px; font-weight: 600; text-transform: uppercase; background: #fafafd; border-y: 1px solid #f0eff3;">Tujuan</th>
-              <th style="padding: 10px 19px; text-align: left; color: #aaa7b4; font-size: 9px; font-weight: 600; text-transform: uppercase; background: #fafafd; border-y: 1px solid #f0eff3;">Status</th>
-              <th style="padding: 10px 19px; text-align: left; color: #aaa7b4; font-size: 9px; font-weight: 600; text-transform: uppercase; background: #fafafd; border-y: 1px solid #f0eff3;"></th>
+              <AppSortableTh field="transfer_number" :current-sort="sortBy" :current-dir="sortDir" @sort="handleSort">Nomor / Tgl</AppSortableTh>
+              <AppSortableTh field="source_warehouse" :current-sort="sortBy" :current-dir="sortDir" @sort="handleSort">Asal (Sumber)</AppSortableTh>
+              <AppSortableTh field="destination_warehouse" :current-sort="sortBy" :current-dir="sortDir" @sort="handleSort">Tujuan</AppSortableTh>
+              <AppSortableTh field="status" :current-sort="sortBy" :current-dir="sortDir" @sort="handleSort">Status</AppSortableTh>
+              <th style="padding: 10px 19px; text-align: left; color: #aaa7b4; font-size: 9px; font-weight: 600; text-transform: uppercase; background: #fafafd; border-top: 1px solid #f0eff3; border-bottom: 1px solid #f0eff3;"></th>
             </tr>
           </thead>
           <tbody>
@@ -388,14 +401,14 @@ onUnmounted(() => {
           </tbody>
         </table>
       </div>
-      <div class="products-pagination" style="display: flex; align-items: center; justify-content: space-between; padding: 14px 19px; color: #aaa7b4; font-size: 10px; border-top: 1px solid #f0eff3;">
-        <span>Menampilkan {{ fromItem }}–{{ toItem }} dari {{ total }} data</span>
-        <div style="display: flex; gap: 4px;">
-          <button class="pagination-button" :disabled="page <= 1" style="border: 1px solid #e9e7ef; background: #fff; color: #858291; border-radius: 5px; padding: 6px 9px; font-size: 10px; cursor: pointer;" @click="goTo(page - 1)">Sebelumnya</button>
-          <button v-for="n in pages" :key="n" class="pagination-button" :style="n === page ? 'border: 1px solid #bd3c3c; background: #bd3c3c; color: #fff; border-radius: 5px; padding: 6px 9px; font-size: 10px; cursor: pointer;' : 'border: 1px solid #e9e7ef; background: #fff; color: #858291; border-radius: 5px; padding: 6px 9px; font-size: 10px; cursor: pointer;'" @click="goTo(n)">{{ n }}</button>
-          <button class="pagination-button" :disabled="page >= lastPage" style="border: 1px solid #e9e7ef; background: #fff; color: #858291; border-radius: 5px; padding: 6px 9px; font-size: 10px; cursor: pointer;" @click="goTo(page + 1)">Berikutnya</button>
-        </div>
-      </div>
+      <AppPagination
+        :page="page"
+        :last-page="lastPage"
+        :total="total"
+        :from="fromItem"
+        :to="toItem"
+        @change="goTo"
+      />
     </div>
 
     <!-- MODAL CREATE -->

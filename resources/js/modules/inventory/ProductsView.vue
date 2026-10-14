@@ -2,6 +2,8 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import axios from 'axios'
 import { ChevronDown, Ellipsis, Package, Plus, Search, AlertTriangle } from 'lucide-vue-next'
+import AppPagination from '../../components/ui/AppPagination.vue'
+import AppSortableTh from '../../components/ui/AppSortableTh.vue'
 
 interface Product {
   id: string
@@ -30,6 +32,8 @@ const errorMessage = ref('')
 
 const search = ref('')
 const categoryFilter = ref('')
+const sortBy = ref('')
+const sortDir = ref<'asc' | 'desc'>('asc')
 const page = ref(1)
 const lastPage = ref(1)
 const total = ref(0)
@@ -63,6 +67,8 @@ const fetchProducts = async () => {
         page: page.value,
         search: search.value || undefined,
         category_id: categoryFilter.value || undefined,
+        sort_by: sortBy.value || undefined,
+        sort_dir: sortBy.value ? sortDir.value : undefined,
       },
     })
     const p = res.data.data
@@ -76,6 +82,13 @@ const fetchProducts = async () => {
   } finally {
     loading.value = false
   }
+}
+
+const handleSort = (field: string, dir: 'asc' | 'desc') => {
+  sortBy.value = field
+  sortDir.value = dir
+  page.value = 1
+  fetchProducts()
 }
 
 const fetchOptions = async () => {
@@ -316,11 +329,11 @@ onUnmounted(() => {
         <table class="products-table" style="width: 100%; min-width: 900px; border-collapse: collapse; font-size: 10px;">
           <thead>
             <tr>
-              <th style="padding: 10px 19px; text-align: left; color: #aaa7b4; font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; background: #fafafd; border-top: 1px solid #f0eff3; border-bottom: 1px solid #f0eff3;">Produk</th>
-              <th style="padding: 10px 19px; text-align: left; color: #aaa7b4; font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; background: #fafafd; border-top: 1px solid #f0eff3; border-bottom: 1px solid #f0eff3;">Kategori</th>
-              <th style="padding: 10px 19px; text-align: left; color: #aaa7b4; font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; background: #fafafd; border-top: 1px solid #f0eff3; border-bottom: 1px solid #f0eff3;">Satuan / Stok Min.</th>
-              <th style="padding: 10px 19px; text-align: right; color: #aaa7b4; font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; background: #fafafd; border-top: 1px solid #f0eff3; border-bottom: 1px solid #f0eff3;">HPP / Harga Jual</th>
-              <th style="padding: 10px 19px; text-align: left; color: #aaa7b4; font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; background: #fafafd; border-top: 1px solid #f0eff3; border-bottom: 1px solid #f0eff3;">Stok Total</th>
+              <AppSortableTh field="name" :current-sort="sortBy" :current-dir="sortDir" @sort="handleSort">Produk</AppSortableTh>
+              <AppSortableTh field="category" :current-sort="sortBy" :current-dir="sortDir" @sort="handleSort">Kategori</AppSortableTh>
+              <AppSortableTh field="minimum_stock" :current-sort="sortBy" :current-dir="sortDir" @sort="handleSort">Satuan / Stok Min.</AppSortableTh>
+              <AppSortableTh field="cost_price" align="right" :current-sort="sortBy" :current-dir="sortDir" @sort="handleSort">HPP / Harga Jual</AppSortableTh>
+              <AppSortableTh field="stock_total" :current-sort="sortBy" :current-dir="sortDir" @sort="handleSort">Stok Total</AppSortableTh>
               <th style="padding: 10px 19px; text-align: left; color: #aaa7b4; font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; background: #fafafd; border-top: 1px solid #f0eff3; border-bottom: 1px solid #f0eff3;">Status</th>
               <th style="padding: 10px 19px; text-align: left; color: #aaa7b4; font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; background: #fafafd; border-top: 1px solid #f0eff3; border-bottom: 1px solid #f0eff3;"></th>
             </tr>
@@ -372,15 +385,18 @@ onUnmounted(() => {
           </tbody>
         </table>
       </div>
-      
-      <div class="products-pagination" style="display: flex; align-items: center; justify-content: space-between; padding: 14px 19px; color: #aaa7b4; font-size: 10px;">
-        <span>Menampilkan {{ from }}–{{ to }} dari {{ total }} produk</span>
-        <div style="display: flex; gap: 4px;">
-          <button class="pagination-button" :disabled="page <= 1" style="border: 1px solid #e9e7ef; background: #fff; color: #858291; border-radius: 5px; padding: 6px 9px; font-size: 10px; cursor: pointer;" @click="goTo(page - 1)">Sebelumnya</button>
-          <button v-for="n in pages" :key="n" class="pagination-button" :style="n === page ? 'border: 1px solid #bd3c3c; background: #bd3c3c; color: #fff; border-radius: 5px; padding: 6px 9px; font-size: 10px; cursor: pointer;' : 'border: 1px solid #e9e7ef; background: #fff; color: #858291; border-radius: 5px; padding: 6px 9px; font-size: 10px; cursor: pointer;'" @click="goTo(n)">{{ n }}</button>
-          <button class="pagination-button" :disabled="page >= lastPage" style="border: 1px solid #e9e7ef; background: #fff; color: #858291; border-radius: 5px; padding: 6px 9px; font-size: 10px; cursor: pointer;" @click="goTo(page + 1)">Berikutnya</button>
-        </div>
-      </div>
+       <AppPagination
+        :page="page"
+        :last-page="lastPage"
+        :total="total"
+        :from="from"
+        :to="to"
+        @change="goTo"
+      >
+        <template #info>
+          <span>Menampilkan {{ from }}–{{ to }} dari {{ total }} produk</span>
+        </template>
+      </AppPagination>
     </div>
 
     <Teleport to="body">

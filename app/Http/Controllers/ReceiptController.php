@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Actions\Inventory\ReceiveStockAction;
 use App\Models\Company;
 use App\Models\Receipt;
+use App\Models\Supplier;
+use App\Models\Warehouse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -12,13 +14,16 @@ class ReceiptController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Receipt::with(['items', 'warehouse'])->latest();
+        $query = Receipt::with(['items', 'warehouse', 'supplier']);
         if ($search = $request->query('search')) {
             $query->where(function ($q) use ($search) {
                 $q->where('receipt_number', 'like', "%{$search}%")
                     ->orWhere('status', 'like', "%{$search}%")
                     ->orWhereHas('warehouse', function ($w) use ($search) {
                         $w->where('name', 'like', "%{$search}%");
+                    })
+                    ->orWhereHas('supplier', function ($s) use ($search) {
+                        $s->where('name', 'like', "%{$search}%");
                     });
             });
         }
@@ -28,6 +33,26 @@ class ReceiptController extends Controller
         if ($endDate = $request->query('end_date')) {
             $query->whereDate('created_at', '<=', $endDate);
         }
+
+        $sortBy = $request->input('sort_by');
+        $sortDir = strtolower($request->input('sort_dir', 'asc')) === 'desc' ? 'desc' : 'asc';
+
+        if ($sortBy === 'warehouse') {
+            $query->orderBy(
+                Warehouse::select('name')->whereColumn('warehouses.id', 'receipts.warehouse_id'),
+                $sortDir
+            );
+        } elseif ($sortBy === 'supplier') {
+            $query->orderBy(
+                Supplier::select('name')->whereColumn('suppliers.id', 'receipts.supplier_id'),
+                $sortDir
+            );
+        } elseif (in_array($sortBy, ['receipt_number', 'status', 'created_at', 'expected_date'], true)) {
+            $query->orderBy($sortBy, $sortDir);
+        } else {
+            $query->latest();
+        }
+
         $receipts = $query->paginate();
 
         return $this->successResponse($receipts);
@@ -71,7 +96,7 @@ class ReceiptController extends Controller
 
     public function show(Receipt $receipt)
     {
-        $receipt->load(['items.product', 'warehouse']);
+        $receipt->load(['items.product.unit', 'warehouse', 'supplier']);
 
         return $this->successResponse($receipt);
     }

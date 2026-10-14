@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Category;
 use App\Models\Product;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -13,15 +14,29 @@ class ProductController extends Controller
      */
     public function index(Request $request)
     {
-        $products = Product::with(['category:id,name', 'brand:id,name', 'unit:id,name,code'])
+        $query = Product::with(['category:id,name', 'brand:id,name', 'unit:id,name,code'])
             ->withSum('stockBalances as stock_total', 'quantity')
             ->when($request->filled('search'), function ($q) use ($request) {
                 $s = '%'.$request->input('search').'%';
                 $q->where(fn ($q) => $q->where('name', 'like', $s)->orWhere('sku', 'like', $s));
             })
-            ->when($request->filled('category_id'), fn ($q) => $q->where('category_id', $request->input('category_id')))
-            ->latest()
-            ->paginate($request->integer('per_page', 10));
+            ->when($request->filled('category_id'), fn ($q) => $q->where('category_id', $request->input('category_id')));
+
+        $sortBy = $request->input('sort_by');
+        $sortDir = strtolower($request->input('sort_dir', 'asc')) === 'desc' ? 'desc' : 'asc';
+
+        if ($sortBy === 'category') {
+            $query->orderBy(
+                Category::select('name')->whereColumn('categories.id', 'products.category_id'),
+                $sortDir
+            );
+        } elseif (in_array($sortBy, ['name', 'sku', 'cost_price', 'selling_price', 'stock_total', 'minimum_stock', 'created_at'], true)) {
+            $query->orderBy($sortBy, $sortDir);
+        } else {
+            $query->latest();
+        }
+
+        $products = $query->paginate($request->integer('per_page', 10));
 
         return $this->successResponse($products);
     }

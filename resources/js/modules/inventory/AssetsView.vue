@@ -5,6 +5,8 @@ import { Html5Qrcode } from 'html5-qrcode'
 import { Ellipsis, Plus, Search, ShieldCheck, ChevronDown, X, ScanLine, AlertTriangle } from 'lucide-vue-next'
 import DateRangePicker from '../../components/DateRangePicker.vue'
 import ProductCombobox from '../../components/forms/ProductCombobox.vue'
+import AppPagination from '../../components/ui/AppPagination.vue'
+import AppSortableTh from '../../components/ui/AppSortableTh.vue'
 
 // --- Scanner kamera untuk Nomor Seri ---
 const showScanner = ref(false)
@@ -120,6 +122,8 @@ const activeWarehouse = ref('')
 const activeStatus = ref('')
 const dateFrom = ref('')
 const dateTo = ref('')
+const sortBy = ref('')
+const sortDir = ref<'asc' | 'desc'>('desc')
 const page = ref(1)
 const total = ref(0)
 const lastPage = ref(1)
@@ -297,19 +301,38 @@ const fetchAssets = async () => {
   try {
     const [statsRes, listRes] = await Promise.all([
       axios.get('/reports/assets/stats', { params: { warehouse_id: activeWarehouse.value, start_date: dateFrom.value, end_date: dateTo.value } }),
-      axios.get('/assets', { params: { page: page.value, search: search.value, status: activeStatus.value, warehouse_id: activeWarehouse.value, start_date: dateFrom.value, end_date: dateTo.value } })
+      axios.get('/assets', { 
+        params: { 
+          page: page.value, 
+          search: search.value, 
+          status: activeStatus.value, 
+          warehouse_id: activeWarehouse.value, 
+          start_date: dateFrom.value, 
+          end_date: dateTo.value,
+          sort_by: sortBy.value || undefined,
+          sort_dir: sortBy.value ? sortDir.value : undefined
+        } 
+      })
     ])
     stats.value = statsRes.data.data
     const data = listRes.data.data
     assets.value = data.data
     total.value = data.total
     lastPage.value = data.last_page
+    from.value = data.from || 0
     to.value = data.to || 0
   } catch (e: any) {
     showToast(e.response?.data?.message || 'Gagal memuat aset', 'error')
   } finally {
     loading.value = false
   }
+}
+
+const handleSort = (field: string, dir: 'asc' | 'desc') => {
+  sortBy.value = field
+  sortDir.value = dir
+  page.value = 1
+  fetchAssets()
 }
 
 const exportCSV = () => {
@@ -463,12 +486,12 @@ const formatDate = (d: string) => {
         <table class="assets-table">
           <thead>
             <tr>
-              <th>Aset</th>
-              <th>Produk</th>
-              <th>Gudang</th>
-              <th>Status</th>
-              <th>Terakhir dilihat</th>
-              <th></th>
+              <AppSortableTh field="serial_number" :current-sort="sortBy" :current-dir="sortDir" @sort="handleSort">Aset / No. Seri</AppSortableTh>
+              <AppSortableTh field="product" :current-sort="sortBy" :current-dir="sortDir" @sort="handleSort">Produk</AppSortableTh>
+              <th style="padding: 10px 19px; text-align: left; color: #aaa7b4; font-size: 9px; font-weight: 600; text-transform: uppercase; background: #fafafd; border-top: 1px solid #f0eff3; border-bottom: 1px solid #f0eff3;">Gudang</th>
+              <AppSortableTh field="status" :current-sort="sortBy" :current-dir="sortDir" @sort="handleSort">Status</AppSortableTh>
+              <AppSortableTh field="updated_at" :current-sort="sortBy" :current-dir="sortDir" @sort="handleSort">Terakhir dilihat</AppSortableTh>
+              <th style="padding: 10px 19px; background: #fafafd; border-top: 1px solid #f0eff3; border-bottom: 1px solid #f0eff3; width: 40px;"></th>
             </tr>
           </thead>
           <tbody>
@@ -505,14 +528,18 @@ const formatDate = (d: string) => {
         </table>
       </div>
       
-      <div class="products-pagination">
-        <span>Menampilkan {{ from }}–{{ to }} dari {{ total }} aset</span>
-        <div>
-          <button class="pagination-button" :disabled="page <= 1" @click="goTo(page - 1)">Sebelumnya</button>
-          <button class="pagination-button" v-for="n in pages" :key="n" :class="{ 'active': n === page }" @click="goTo(n)">{{ n }}</button>
-          <button class="pagination-button" :disabled="page >= lastPage" @click="goTo(page + 1)">Berikutnya</button>
-        </div>
-      </div>
+      <AppPagination
+        :page="page"
+        :last-page="lastPage"
+        :total="total"
+        :from="from"
+        :to="to"
+        @change="goTo"
+      >
+        <template #info>
+          <span>Menampilkan {{ from }}–{{ to }} dari {{ total }} aset</span>
+        </template>
+      </AppPagination>
     </div>
     
     <Teleport to="body">

@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import axios from 'axios'
-import { Plus, Search, Ellipsis, AlertTriangle, ArrowDownToLine, PackageOpen, CheckCircle2, Trash2 } from 'lucide-vue-next'
+import { Plus, Search, Ellipsis, AlertTriangle, ArrowDownToLine, PackageOpen, CheckCircle2, Trash2, Eye, Building2, Warehouse as WarehouseIcon, Calendar, Check, X } from 'lucide-vue-next'
 import DateRangePicker from '../../components/DateRangePicker.vue'
 import ProductCombobox from '../../components/forms/ProductCombobox.vue'
+import AppPagination from '../../components/ui/AppPagination.vue'
+import AppSortableTh from '../../components/ui/AppSortableTh.vue'
 
 interface Product { id: string; name: string; sku: string; has_serial_number: boolean; unit?: { code: string } }
 interface Warehouse { id: string; name: string; code: string }
@@ -42,6 +44,8 @@ const fromItem = ref(0)
 const toItem = ref(0)
 const dateFrom = ref('')
 const dateTo = ref('')
+const sortBy = ref('')
+const sortDir = ref<'asc' | 'desc'>('asc')
 let searchTimer: ReturnType<typeof setTimeout> | null = null
 
 const toastMessage = ref('')
@@ -87,7 +91,9 @@ const fetchReceipts = async () => {
         page: page.value,
         search: search.value || undefined,
         start_date: dateFrom.value || undefined,
-        end_date: dateTo.value || undefined
+        end_date: dateTo.value || undefined,
+        sort_by: sortBy.value || undefined,
+        sort_dir: sortBy.value ? sortDir.value : undefined
       } 
     })
     const data = res.data.data
@@ -101,6 +107,13 @@ const fetchReceipts = async () => {
   } finally {
     loading.value = false
   }
+}
+
+const handleSort = (field: string, dir: 'asc' | 'desc') => {
+  sortBy.value = field
+  sortDir.value = dir
+  page.value = 1
+  fetchReceipts()
 }
 
 const exportCSV = () => {
@@ -216,6 +229,27 @@ const submitCreate = async () => {
   }
 }
 
+// DETAIL MODAL
+const showDetailModal = ref(false)
+const loadingDetail = ref(false)
+const detailReceipt = ref<any | null>(null)
+
+const openDetail = async (r: Receipt) => {
+  closeDropdown()
+  showDetailModal.value = true
+  loadingDetail.value = true
+  detailReceipt.value = r
+
+  try {
+    const res = await axios.get(`/receipts/${r.id}`)
+    detailReceipt.value = res.data.data
+  } catch (e: any) {
+    showToast(e.response?.data?.message || 'Gagal memuat rincian penerimaan', 'error')
+  } finally {
+    loadingDetail.value = false
+  }
+}
+
 // POST (PROCESS) MODAL
 const showPostModal = ref(false)
 const posting = ref(false)
@@ -318,11 +352,11 @@ onUnmounted(() => {
         <table class="modern-table" style="width: 100%; min-width: 900px; border-collapse: collapse; font-size: 11px;">
           <thead>
             <tr>
-              <th style="padding: 10px 19px; text-align: left; color: #aaa7b4; font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; background: #fafafd; border-top: 1px solid #f0eff3; border-bottom: 1px solid #f0eff3;">Nomor / Gudang</th>
-              <th style="padding: 10px 19px; text-align: left; color: #aaa7b4; font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; background: #fafafd; border-top: 1px solid #f0eff3; border-bottom: 1px solid #f0eff3;">Pemasok</th>
-              <th style="padding: 10px 19px; text-align: left; color: #aaa7b4; font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; background: #fafafd; border-top: 1px solid #f0eff3; border-bottom: 1px solid #f0eff3;">Tgl Estimasi / Terima</th>
-              <th style="padding: 10px 19px; text-align: left; color: #aaa7b4; font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; background: #fafafd; border-top: 1px solid #f0eff3; border-bottom: 1px solid #f0eff3;">Status</th>
-              <th style="padding: 10px 19px; text-align: left; color: #aaa7b4; font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; background: #fafafd; border-top: 1px solid #f0eff3; border-bottom: 1px solid #f0eff3;"></th>
+              <AppSortableTh field="receipt_number" :current-sort="sortBy" :current-dir="sortDir" @sort="handleSort">Nomor / Gudang</AppSortableTh>
+              <AppSortableTh field="supplier" :current-sort="sortBy" :current-dir="sortDir" @sort="handleSort">Pemasok</AppSortableTh>
+              <AppSortableTh field="expected_date" :current-sort="sortBy" :current-dir="sortDir" @sort="handleSort">Tgl Estimasi / Terima</AppSortableTh>
+              <AppSortableTh field="status" :current-sort="sortBy" :current-dir="sortDir" @sort="handleSort">Status</AppSortableTh>
+              <th style="padding: 10px 19px; text-align: right; color: #aaa7b4; font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; background: #fafafd; border-top: 1px solid #f0eff3; border-bottom: 1px solid #f0eff3;">Aksi</th>
             </tr>
           </thead>
           <tbody>
@@ -330,14 +364,14 @@ onUnmounted(() => {
               <td style="padding: 12px 19px;">
                 <div style="display: flex; align-items: center; gap: 10px;">
                   <div style="width: 32px; height: 32px; border-radius: 8px; background: #f0eff3; color: #555164; display: grid; place-items: center;"><ArrowDownToLine :size="16" /></div>
-                  <div>
-                    <strong style="display: block; font-size: 12px; color: #292541; margin-bottom: 2px;">{{ item.receipt_number }}</strong>
+                  <div style="cursor: pointer;" @click="openDetail(item)" title="Klik untuk melihat detail penerimaan">
+                    <strong style="display: block; font-size: 12px; color: #292541; margin-bottom: 2px;" class="receipt-link">{{ item.receipt_number }}</strong>
                     <span style="font-size: 10px; color: #aaa7b4;">{{ item.warehouse?.name }}</span>
                   </div>
                 </div>
               </td>
               <td style="padding: 12px 19px; color: #555164;">
-                {{ suppliers.find(s => s.id === item.supplier_id)?.name || '-' }}
+                {{ suppliers.find(s => s.id === item.supplier_id)?.name || item.supplier?.name || '-' }}
               </td>
               <td style="padding: 12px 19px; color: #555164;">
                 <div style="display: flex; flex-direction: column; gap: 4px;">
@@ -350,26 +384,42 @@ onUnmounted(() => {
                   {{ item.status === 'POSTED' ? 'DITERIMA' : 'DIJADWALKAN' }}
                 </span>
               </td>
-              <td style="padding: 12px 19px;">
-                <button v-if="item.status === 'EXPECTED'" style="background: none; border: 0; color: #aaa7b5; cursor: pointer; padding: 4px;" @click.stop="toggleDropdown($event, item.id)"><Ellipsis :size="16" /></button>
-                <Teleport to="body">
-                  <div v-if="activeDropdown === item.id" style="position: fixed; background: #fff; border: 1px solid #eeedf3; border-radius: 8px; padding: 6px; box-shadow: 0 8px 24px rgba(0,0,0,0.12); z-index: 9999; min-width: 150px;" :style="{ top: dropdownY + 'px', left: dropdownX + 'px' }" @click.stop>
-                    <button style="display: block; width: 100%; text-align: left; background: none; border: 0; padding: 9px 12px; font-size: 11px; color: #3b9d76; border-radius: 5px; cursor: pointer;" onmouseover="this.style.background='#eaf8f1'" onmouseout="this.style.background='none'" @click="openPost(item)"><CheckCircle2 :size="14" style="display:inline-block; vertical-align:middle; margin-right:6px;" /> Proses Penerimaan</button>
-                  </div>
-                </Teleport>
+              <td style="padding: 10px 19px; text-align: right;">
+                <div style="display: flex; align-items: center; justify-content: flex-end; gap: 6px;">
+                  <button 
+                    type="button"
+                    class="btn-detail-action" 
+                    title="Lihat Detail Penerimaan"
+                    @click.stop="openDetail(item)"
+                  >
+                    <Eye :size="13" />
+                    <span>Detail</span>
+                  </button>
+
+                  <button 
+                    v-if="item.status === 'EXPECTED'" 
+                    type="button"
+                    class="btn-process-action"
+                    title="Proses Penerimaan Fisik"
+                    @click.stop="openPost(item)"
+                  >
+                    <CheckCircle2 :size="13" />
+                    <span>Proses</span>
+                  </button>
+                </div>
               </td>
             </tr>
           </tbody>
         </table>
       </div>
-      <div class="products-pagination" style="display: flex; align-items: center; justify-content: space-between; padding: 14px 19px; color: #aaa7b4; font-size: 10px; border-top: 1px solid #f0eff3;">
-        <span>Menampilkan {{ fromItem }}–{{ toItem }} dari {{ total }} data</span>
-        <div style="display: flex; gap: 4px;">
-          <button class="pagination-button" :disabled="page <= 1" style="border: 1px solid #e9e7ef; background: #fff; color: #858291; border-radius: 5px; padding: 6px 9px; font-size: 10px; cursor: pointer;" @click="goTo(page - 1)">Sebelumnya</button>
-          <button v-for="n in pages" :key="n" class="pagination-button" :style="n === page ? 'border: 1px solid #bd3c3c; background: #bd3c3c; color: #fff; border-radius: 5px; padding: 6px 9px; font-size: 10px; cursor: pointer;' : 'border: 1px solid #e9e7ef; background: #fff; color: #858291; border-radius: 5px; padding: 6px 9px; font-size: 10px; cursor: pointer;'" @click="goTo(n)">{{ n }}</button>
-          <button class="pagination-button" :disabled="page >= lastPage" style="border: 1px solid #e9e7ef; background: #fff; color: #858291; border-radius: 5px; padding: 6px 9px; font-size: 10px; cursor: pointer;" @click="goTo(page + 1)">Berikutnya</button>
-        </div>
-      </div>
+      <AppPagination
+        :page="page"
+        :last-page="lastPage"
+        :total="total"
+        :from="fromItem"
+        :to="toItem"
+        @change="goTo"
+      />
     </div>
 
     <!-- MODAL CREATE -->
@@ -522,6 +572,175 @@ onUnmounted(() => {
                 <button type="submit" class="primary-button" :disabled="posting" style="background: #3b9d76; border-color: #3b9d76;">{{ posting ? 'Memproses...' : 'Selesaikan Penerimaan' }}</button>
               </div>
             </form>
+          </div>
+        </div>
+      </Transition>
+
+      <!-- MODAL DETAIL PENERIMAAN -->
+      <Transition name="fade">
+        <div v-if="showDetailModal" class="modal-backdrop" @click="showDetailModal = false">
+          <div class="modal-content" style="max-width: 720px; width: 95%;" @click.stop>
+            <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center;">
+              <div>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                  <h2>{{ detailReceipt?.receipt_number || 'Detail Penerimaan' }}</h2>
+                  <span 
+                    :class="{ 'status-pill success': detailReceipt?.status === 'POSTED', 'status-pill warning': detailReceipt?.status === 'EXPECTED' }" 
+                    style="padding: 3px 8px; border-radius: 4px; font-size: 10px; font-weight: 700; letter-spacing: 0.04em;"
+                  >
+                    {{ detailReceipt?.status === 'POSTED' ? 'SUDAH DITERIMA' : 'DIJADWALKAN' }}
+                  </span>
+                </div>
+                <p style="margin-top: 4px; font-size: 11px; color: #858291;">
+                  Rincian data barang masuk, kuantitas fisik riil, dan tujuan gudang.
+                </p>
+              </div>
+              <button 
+                type="button" 
+                class="btn-close-modal" 
+                title="Tutup" 
+                @click="showDetailModal = false"
+              >
+                <X :size="18" />
+              </button>
+            </div>
+
+            <div class="modal-body-scroll" style="max-height: 75vh; overflow-y: auto; padding: 22px 28px;">
+              <div v-if="loadingDetail && !detailReceipt?.items?.length" style="padding: 40px; text-align: center; color: #aaa7b4; font-size: 12px;">
+                Memuat rincian penerimaan...
+              </div>
+
+              <div v-else style="display: flex; flex-direction: column; gap: 20px;">
+                <!-- Summary Info Cards Grid -->
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;">
+                  <div class="detail-info-card">
+                    <span class="detail-card-label">
+                      <WarehouseIcon :size="13" /> Gudang Tujuan
+                    </span>
+                    <strong class="detail-card-value">
+                      {{ detailReceipt?.warehouse?.name || '-' }}
+                    </strong>
+                    <span v-if="detailReceipt?.warehouse?.code" class="detail-card-sub">
+                      Kode: {{ detailReceipt.warehouse.code }}
+                    </span>
+                  </div>
+
+                  <div class="detail-info-card">
+                    <span class="detail-card-label">
+                      <Building2 :size="13" /> Pemasok / Vendor
+                    </span>
+                    <strong class="detail-card-value">
+                      {{ detailReceipt?.supplier?.name || suppliers.find(s => s.id === detailReceipt?.supplier_id)?.name || 'Tanpa Pemasok' }}
+                    </strong>
+                    <span v-if="detailReceipt?.supplier?.email" class="detail-card-sub">
+                      {{ detailReceipt.supplier.email }}
+                    </span>
+                  </div>
+
+                  <div class="detail-info-card">
+                    <span class="detail-card-label">
+                      <Calendar :size="13" /> Tanggal
+                    </span>
+                    <strong class="detail-card-value">
+                      {{ detailReceipt?.status === 'POSTED' ? (formatDate(detailReceipt?.received_date) || '-') : (formatDate(detailReceipt?.expected_date) || '-') }}
+                    </strong>
+                    <span class="detail-card-sub">
+                      {{ detailReceipt?.status === 'POSTED' ? 'Tanggal Barang Diterima' : 'Estimasi Barang Datang' }}
+                    </span>
+                  </div>
+                </div>
+
+                <!-- Remarks / Notes if present -->
+                <div v-if="detailReceipt?.remarks" style="background: #fafafd; border: 1px dashed #e4e2ee; border-radius: 8px; padding: 10px 14px; font-size: 11px; color: #555164;">
+                  <strong style="color: #292541; margin-right: 6px;">Catatan / Referensi:</strong>
+                  {{ detailReceipt.remarks }}
+                </div>
+
+                <!-- Items Section -->
+                <div>
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                    <h3 style="font-size: 12px; font-weight: 700; color: #292541; text-transform: uppercase; letter-spacing: 0.04em; margin: 0;">
+                      Daftar Barang ({{ detailReceipt?.items?.length || 0 }} Item)
+                    </h3>
+                  </div>
+
+                  <div class="detail-table-wrapper">
+                    <table class="detail-table">
+                      <thead>
+                        <tr>
+                          <th style="width: 36px; text-align: center;">No</th>
+                          <th>Produk / Barang</th>
+                          <th style="text-align: right; width: 120px;">Qty Diharapkan</th>
+                          <th style="text-align: right; width: 120px;">Qty Diterima</th>
+                          <th style="width: 80px; text-align: center;">Satuan</th>
+                          <th style="width: 100px; text-align: center;">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr v-for="(it, idx) in detailReceipt?.items" :key="it.id || idx">
+                          <td style="text-align: center; color: #aaa7b4; font-size: 10px;">{{ idx + 1 }}</td>
+                          <td>
+                            <div style="display: flex; flex-direction: column; gap: 2px;">
+                              <span style="font-size: 12px; font-weight: 600; color: #292541;">
+                                {{ it.product?.name || products.find(p => p.id === it.product_id)?.name || 'Produk' }}
+                              </span>
+                              <div style="display: flex; align-items: center; gap: 6px;">
+                                <span class="sku-tag" style="font-size: 9px;">
+                                  {{ it.product?.sku || products.find(p => p.id === it.product_id)?.sku || '-' }}
+                                </span>
+                                <span v-if="it.product?.has_serial_number" class="sn-badge" style="font-size: 8px; padding: 1px 4px;">
+                                  Serial Number
+                                </span>
+                              </div>
+                            </div>
+                          </td>
+                          <td style="text-align: right; font-weight: 600; color: #777486; font-size: 12px;">
+                            {{ Number(it.expected_quantity) }}
+                          </td>
+                          <td style="text-align: right; font-weight: 700; font-size: 13px;" :style="{ color: detailReceipt?.status === 'POSTED' ? '#3b9d76' : '#292541' }">
+                            {{ it.received_quantity !== null && it.received_quantity !== undefined ? Number(it.received_quantity) : '-' }}
+                          </td>
+                          <td style="text-align: center;">
+                            <span class="unit-badge">
+                              {{ it.product?.unit?.code || products.find(p => p.id === it.product_id)?.unit?.code || 'pcs' }}
+                            </span>
+                          </td>
+                          <td style="text-align: center;">
+                            <span 
+                              v-if="detailReceipt?.status === 'POSTED'" 
+                              class="status-pill success" 
+                              style="font-size: 9px; padding: 2px 6px; display: inline-flex; align-items: center; gap: 3px;"
+                            >
+                              <Check :size="10" /> Selesai
+                            </span>
+                            <span 
+                              v-else 
+                              class="status-pill warning" 
+                              style="font-size: 9px; padding: 2px 6px;"
+                            >
+                              Menunggu
+                            </span>
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="modal-footer" style="padding: 16px 28px; background: #fafafd; border-top: 1px solid #f0eff3;">
+              <button type="button" class="cancel-button" @click="showDetailModal = false">Tutup</button>
+              <button 
+                v-if="detailReceipt?.status === 'EXPECTED'" 
+                type="button" 
+                class="primary-button" 
+                style="background: #3b9d76; border-color: #3b9d76;"
+                @click="showDetailModal = false; openPost(detailReceipt)"
+              >
+                <CheckCircle2 :size="14" /> Lanjutkan Proses Penerimaan
+              </button>
+            </div>
           </div>
         </div>
       </Transition>
@@ -690,5 +909,142 @@ onUnmounted(() => {
   background: #fff2f2;
   border-color: #f7d2d2;
   color: #d47770;
+}
+
+.receipt-link {
+  transition: color 0.15s ease;
+}
+
+.receipt-link:hover {
+  color: #bd3c3c !important;
+  text-decoration: underline;
+}
+
+.btn-detail-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: #ffffff;
+  border: 1px solid #e2e0eb;
+  color: #48445c;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 5px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+}
+
+.btn-detail-action:hover {
+  background: #f7f6fd;
+  border-color: #6a5ce8;
+  color: #6a5ce8;
+}
+
+.btn-process-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: #eaf8f1;
+  border: 1px solid #c7eed9;
+  color: #2b8460;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 5px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-process-action:hover {
+  background: #3b9d76;
+  border-color: #3b9d76;
+  color: #ffffff;
+}
+
+.btn-close-modal {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #858291;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.btn-close-modal:hover {
+  background: #f0eff3;
+  color: #292541;
+}
+
+.detail-info-card {
+  background: #fafafd;
+  border: 1px solid #eeedf3;
+  border-radius: 10px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.detail-card-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+  font-weight: 700;
+  color: #858291;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.detail-card-value {
+  font-size: 13px;
+  color: #292541;
+  font-weight: 600;
+}
+
+.detail-card-sub {
+  font-size: 10px;
+  color: #aaa7b4;
+}
+
+.detail-table-wrapper {
+  background: #ffffff;
+  border: 1px solid #eeedf3;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.detail-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.detail-table th {
+  background: #fafafd;
+  color: #858291;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 10px 14px;
+  border-bottom: 1px solid #eeedf3;
+  text-align: left;
+}
+
+.detail-table td {
+  padding: 12px 14px;
+  border-bottom: 1px solid #f6f5fa;
+  font-size: 11px;
+}
+
+.detail-table tr:last-child td {
+  border-bottom: none;
 }
 </style>
