@@ -206,16 +206,18 @@ onUnmounted(() => {
   <section class="dashboard-page">
     <!-- Header -->
     <div class="page-heading">
-      <div>
+      <div class="heading-text">
         <p class="eyebrow">{{ currentDateFormatted }}</p>
         <h1>{{ greeting }}, <span>{{ authStore.user?.name || 'Administrator' }}</span></h1>
         <p class="muted">Berikut ringkasan operasional dan status inventaris Anda hari ini.</p>
       </div>
       
       <!-- Quick Actions Button & Dropdown -->
-      <div class="quick-actions-wrap" style="position: relative;">
-        <button class="primary-button" @click.stop="showQuickActions = !showQuickActions">
-          <Plus :size="17" /> Operasi baru <ChevronDown :size="14" style="margin-left: 2px;" />
+      <div class="quick-actions-wrap">
+        <button class="primary-button quick-action-btn" @click.stop="showQuickActions = !showQuickActions">
+          <Plus :size="16" />
+          <span>Operasi baru</span>
+          <ChevronDown :size="14" class="chevron-icon" :class="{ 'rotate': showQuickActions }" />
         </button>
 
         <Transition name="fade">
@@ -258,10 +260,12 @@ onUnmounted(() => {
     <section class="metric-grid">
       <!-- Card 1: Total Nilai Stok -->
       <div class="metric-card">
-        <div class="metric-icon blue">
-          <DollarSign :size="17" />
+        <div class="metric-card-top">
+          <div class="metric-label">Total nilai stok (HPP)</div>
+          <div class="metric-icon blue">
+            <DollarSign :size="16" />
+          </div>
         </div>
-        <div class="metric-label">Total nilai stok (HPP)</div>
         <div class="metric-value">
           <span v-if="loading"><Loader2 class="spin" :size="20" /></span>
           <span v-else>{{ formatCurrency(kpi.total_stock_value) }}</span>
@@ -273,13 +277,15 @@ onUnmounted(() => {
 
       <!-- Card 2: Barang Tersedia -->
       <div class="metric-card">
-        <div class="metric-icon green">
-          <Package :size="17" />
+        <div class="metric-card-top">
+          <div class="metric-label">Barang tersedia (Fisik)</div>
+          <div class="metric-icon green">
+            <Package :size="16" />
+          </div>
         </div>
-        <div class="metric-label">Barang tersedia (Fisik)</div>
         <div class="metric-value">
           <span v-if="loading"><Loader2 class="spin" :size="20" /></span>
-          <span v-else>{{ formatNumber(kpi.total_physical_stock) }} <small style="font-size: 13px; font-weight: normal; color: #858291;">unit</small></span>
+          <span v-else>{{ formatNumber(kpi.total_physical_stock) }} <small class="unit-text">unit</small></span>
         </div>
         <div class="metric-detail">
           <span>{{ kpi.total_catalog_products }}</span> total katalog terdaftar
@@ -288,13 +294,15 @@ onUnmounted(() => {
 
       <!-- Card 3: Operasi Berjalan -->
       <div class="metric-card">
-        <div class="metric-icon orange">
-          <Clock :size="17" />
+        <div class="metric-card-top">
+          <div class="metric-label">Operasi menunggu</div>
+          <div class="metric-icon orange">
+            <Clock :size="16" />
+          </div>
         </div>
-        <div class="metric-label">Operasi menunggu</div>
         <div class="metric-value">
           <span v-if="loading"><Loader2 class="spin" :size="20" /></span>
-          <span v-else>{{ kpi.pending_transfers + kpi.pending_reservations }} <small style="font-size: 13px; font-weight: normal; color: #858291;">proses</small></span>
+          <span v-else>{{ kpi.pending_transfers + kpi.pending_reservations }} <small class="unit-text">proses</small></span>
         </div>
         <div class="metric-detail">
           <span>{{ kpi.pending_transfers }}</span> transfer, <span>{{ kpi.pending_reservations }}</span> reservasi
@@ -303,14 +311,18 @@ onUnmounted(() => {
 
       <!-- Card 4: Peringatan Stok Menipis -->
       <div class="metric-card">
-        <div class="metric-icon" :class="kpi.low_stock_count > 0 ? 'red' : 'green'">
-          <AlertTriangle v-if="kpi.low_stock_count > 0" :size="17" />
-          <CheckCircle2 v-else :size="17" />
+        <div class="metric-card-top">
+          <div class="metric-label">Peringatan stok menipis</div>
+          <div class="metric-icon" :class="kpi.low_stock_count > 0 ? 'red' : 'green'">
+            <AlertTriangle v-if="kpi.low_stock_count > 0" :size="16" />
+            <CheckCircle2 v-else :size="16" />
+          </div>
         </div>
-        <div class="metric-label">Peringatan stok menipis</div>
         <div class="metric-value">
           <span v-if="loading"><Loader2 class="spin" :size="20" /></span>
-          <span v-else :style="{ color: kpi.low_stock_count > 0 ? '#bd3c3c' : 'inherit' }">{{ kpi.low_stock_count }} <small style="font-size: 13px; font-weight: normal; color: #858291;">produk</small></span>
+          <span v-else :style="{ color: kpi.low_stock_count > 0 ? '#bd3c3c' : 'inherit' }">
+            {{ kpi.low_stock_count }} <small class="unit-text">produk</small>
+          </span>
         </div>
         <div class="metric-detail" :class="{ 'alert-detail': kpi.low_stock_count > 0 }">
           <span v-if="kpi.low_stock_count > 0">{{ kpi.low_stock_count }} item</span>
@@ -325,17 +337,17 @@ onUnmounted(() => {
       <!-- Left Panel: Monthly Movements Chart -->
       <div class="panel stock-panel">
         <div class="panel-header">
-          <div>
+          <div class="panel-title-wrap">
             <h2>Pergerakan stok bulanan</h2>
             <p>Stok masuk (Inbound) vs Stok keluar (Outbound)</p>
           </div>
 
           <!-- Warehouse Dropdown Filter -->
-          <div class="warehouse-selector-wrap" style="position: relative;">
+          <div class="warehouse-selector-wrap">
             <button class="select-button" @click.stop="showWarehouseDropdown = !showWarehouseDropdown">
               <WarehouseIcon :size="13" style="color: #bd3c3c;" />
-              <span>{{ selectedWarehouseName }}</span>
-              <ChevronDown :size="14" />
+              <span class="wh-btn-label">{{ selectedWarehouseName }}</span>
+              <ChevronDown :size="14" class="chevron-icon" :class="{ 'rotate': showWarehouseDropdown }" />
             </button>
 
             <Transition name="fade">
@@ -413,7 +425,7 @@ onUnmounted(() => {
           <div class="chart-legend">
             <span><i class="legend-dot purple" />Stok Masuk (Inbound)</span>
             <span><i class="legend-dot lilac" />Stok Keluar (Outbound)</span>
-            <strong>Data aktual sistem</strong>
+            <strong class="chart-footnote">Data aktual sistem</strong>
           </div>
         </div>
       </div>
@@ -464,15 +476,15 @@ onUnmounted(() => {
           </div>
         </div>
 
-        <button class="outline-button" @click="router.push('/products')">
+        <button class="outline-button alert-action-btn" @click="router.push('/products')">
           Kelola katalog & batas minimum
         </button>
       </div>
     </section>
 
-    <!-- Bottom Panel: Recent Movements Activity Table -->
+    <!-- Bottom Panel: Recent Movements Activity Table & Mobile Cards -->
     <section class="panel activity-panel">
-      <div class="panel-header" style="border-bottom: 1px solid #f0eff3; padding-bottom: 14px;">
+      <div class="panel-header activity-panel-header">
         <div>
           <h2>Aktivitas Pergerakan Terbaru</h2>
           <p>Daftar riwayat mutasi masuk, keluar, dan penyesuaian stok terkini</p>
@@ -482,7 +494,8 @@ onUnmounted(() => {
         </button>
       </div>
 
-      <div class="table-wrap">
+      <!-- Desktop Table View -->
+      <div class="table-wrap desktop-table-wrap">
         <table>
           <thead>
             <tr>
@@ -519,7 +532,7 @@ onUnmounted(() => {
                       purple: mov.type === 'ADJUSTMENT'
                     }"
                   />
-                  <strong>{{ mov.type === 'IN' ? 'Masuk' : mov.type === 'OUT' ? 'Keluar' : mov.type }}</strong>
+                  <strong>{{ mov.type === 'IN' ? 'Masuk' : mov.type === 'OUT' ? 'Keluar' : mov.type === 'TRANSFER' ? 'Transfer' : 'Penyesuaian' }}</strong>
                 </div>
               </td>
               <td>
@@ -551,6 +564,64 @@ onUnmounted(() => {
             </tr>
           </tbody>
         </table>
+      </div>
+
+      <!-- Mobile Activity Cards View -->
+      <div class="mobile-activity-list">
+        <div v-if="loading" class="mobile-state">
+          <Loader2 class="spin" :size="20" style="margin: 0 auto 8px;" />
+          <span>Memuat riwayat pergerakan...</span>
+        </div>
+        <div v-else-if="recentMovements.length === 0" class="mobile-state">
+          <span>Belum ada aktivitas mutasi stok yang tercatat.</span>
+        </div>
+        <div
+          v-for="mov in recentMovements"
+          :key="mov.id"
+          class="mobile-movement-card"
+        >
+          <div class="mm-top">
+            <div class="activity-type">
+              <i
+                class="activity-dot"
+                :class="{
+                  green: mov.type === 'IN',
+                  red: mov.type === 'OUT',
+                  blue: mov.type === 'TRANSFER',
+                  purple: mov.type === 'ADJUSTMENT'
+                }"
+              />
+              <strong>{{ mov.type === 'IN' ? 'Masuk' : mov.type === 'OUT' ? 'Keluar' : mov.type === 'TRANSFER' ? 'Transfer' : 'Penyesuaian' }}</strong>
+            </div>
+            <span class="mm-time">{{ formatDateTime(mov.created_at) }}</span>
+          </div>
+
+          <div class="mm-body">
+            <div class="mm-info">
+              <strong class="mm-product-name">{{ mov.product?.name || '-' }}</strong>
+              <span class="mm-sku">SKU: {{ mov.product?.sku || '-' }}</span>
+            </div>
+            <div class="mm-qty" :class="{ negative: mov.type === 'OUT' }">
+              {{ mov.type === 'OUT' ? '-' : '+' }}{{ mov.quantity }}
+            </div>
+          </div>
+
+          <div class="mm-meta">
+            <div class="mm-location">
+              <span>{{ mov.warehouse?.name || '-' }}</span>
+              <span v-if="mov.warehouse_location?.code || mov.warehouse_location?.name" class="mm-subloc">
+                ({{ mov.warehouse_location?.code || mov.warehouse_location?.name }})
+              </span>
+            </div>
+            <div class="mm-balance">
+              Sisa: <strong>{{ mov.balance_after }}</strong>
+            </div>
+          </div>
+
+          <div v-if="mov.remarks || mov.reference_id" class="mm-ref">
+            <span>Ref: {{ mov.remarks || mov.reference_id }}</span>
+          </div>
+        </div>
       </div>
     </section>
   </section>
@@ -586,11 +657,26 @@ onUnmounted(() => {
 }
 
 /* Quick Actions Dropdown */
+.quick-actions-wrap {
+  position: relative;
+}
+
+.quick-action-btn {
+  white-space: nowrap;
+}
+
+.chevron-icon {
+  transition: transform 0.2s ease;
+}
+
+.chevron-icon.rotate {
+  transform: rotate(180deg);
+}
+
 .quick-actions-menu {
   position: absolute;
   right: 0;
-  top: 100%;
-  margin-top: 8px;
+  top: calc(100% + 6px);
   width: 250px;
   background: white;
   border: 1px solid #eeedf3;
@@ -621,6 +707,7 @@ onUnmounted(() => {
   border: 0;
   border-bottom: 1px solid #f5f4f8;
   text-align: left;
+  cursor: pointer;
   transition: background 0.15s;
 }
 
@@ -660,16 +747,44 @@ onUnmounted(() => {
 }
 
 /* Warehouse Dropdown */
+.warehouse-selector-wrap {
+  position: relative;
+}
+
+.select-button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: white;
+  border: 1px solid #e9e7ef;
+  border-radius: 6px;
+  padding: 7px 11px;
+  color: #777486;
+  font-size: 11px;
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+}
+
+.select-button:hover {
+  border-color: #d8d6e2;
+}
+
+.wh-btn-label {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 180px;
+}
+
 .warehouse-dropdown {
   position: absolute;
   right: 0;
-  top: 100%;
-  margin-top: 6px;
+  top: calc(100% + 6px);
   min-width: 210px;
   background: white;
   border: 1px solid #eeedf3;
   border-radius: 8px;
-  box-shadow: 0 8px 20px rgba(41, 37, 65, 0.08);
+  box-shadow: 0 8px 24px rgba(41, 37, 65, 0.1);
   z-index: 50;
   overflow: hidden;
 }
@@ -683,6 +798,7 @@ onUnmounted(() => {
   font-size: 11px;
   color: #555164;
   border-bottom: 1px solid #f5f4f8;
+  cursor: pointer;
   transition: all 0.15s;
 }
 
@@ -715,18 +831,90 @@ onUnmounted(() => {
   transform: translateY(-4px);
 }
 
-/* Compact & balanced metric cards */
+/* Metric Cards - Modern Flex Layout */
 .metric-card {
-  min-height: auto;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 130px;
   padding: 16px 18px;
+  background: white;
+  border: 1px solid #eeedf3;
+  border-radius: 10px;
+  box-sizing: border-box;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 
+.metric-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(41, 37, 65, 0.05);
+}
+
+.metric-card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+}
+
+.metric-card-top .metric-label {
+  flex: 1;
+  font-size: 11px;
+  line-height: 1.35;
+  color: #858291;
+  margin: 0;
+  word-break: break-word;
+}
+
+.metric-card-top .metric-icon {
+  position: static;
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  margin-top: -2px;
+}
+
+.metric-card-top .metric-icon.blue { color: #4e8acc; background: #edf5fc; }
+.metric-card-top .metric-icon.green { color: #38a77a; background: #eaf8f1; }
+.metric-card-top .metric-icon.orange { color: #dc9b45; background: #fff6e8; }
+.metric-card-top .metric-icon.red { color: #d97070; background: #fff0f0; }
+
 .metric-value {
+  font-size: 22px;
+  font-weight: 720;
+  letter-spacing: -0.03em;
   margin-top: 10px;
+  color: #292541;
+  line-height: 1.2;
+  word-break: break-word;
+}
+
+.unit-text {
+  font-size: 12px;
+  font-weight: normal;
+  color: #858291;
 }
 
 .metric-detail {
+  font-size: 10px;
+  color: #aaa7b2;
   margin-top: 8px;
+  line-height: 1.35;
+}
+
+.metric-detail span {
+  color: #39a478;
+  font-weight: 700;
+  margin-right: 4px;
+}
+
+.metric-detail.alert-detail span {
+  color: #dc706f;
 }
 
 /* Full-height responsive chart styles */
@@ -750,8 +938,14 @@ onUnmounted(() => {
   flex: 1;
 }
 
-.alerts-panel .outline-button {
-  margin-top: auto;
+.alerts-panel .alert-action-btn {
+  margin: 10px 16px 14px;
+  width: calc(100% - 32px);
+  height: 33px;
+  font-size: 10.5px;
+  font-weight: 600;
+  cursor: pointer;
+  border-radius: 6px;
 }
 
 .chart-wrap {
@@ -778,7 +972,6 @@ onUnmounted(() => {
   justify-content: space-between;
   color: #b2afbc;
   font-size: 9px;
-  float: none;
   user-select: none;
   padding: 0;
   margin: 0;
@@ -904,5 +1097,376 @@ onUnmounted(() => {
   color: #85818e;
   font-size: 10px;
   margin-top: 14px;
+}
+
+.chart-footnote {
+  color: #aaa7b4;
+  font-weight: 400;
+  margin-left: auto;
+}
+
+/* Activity Panel & Movement Cards */
+.activity-panel-header {
+  border-bottom: 1px solid #f0eff3;
+  padding-bottom: 14px;
+}
+
+.desktop-table-wrap {
+  display: block;
+  overflow-x: auto;
+}
+
+.mobile-activity-list {
+  display: none;
+  padding: 12px 14px 14px;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.mobile-movement-card {
+  background: #fafafd;
+  border: 1px solid #eeedf3;
+  border-radius: 9px;
+  padding: 12px 13px;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.mobile-movement-card:hover {
+  background: #f6f5fc;
+  border-color: #e2e0ed;
+}
+
+.mm-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 7px;
+  border-bottom: 1px solid #f0eff4;
+  margin-bottom: 8px;
+}
+
+.mm-time {
+  font-size: 9.5px;
+  color: #aaa7b2;
+}
+
+.mm-body {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.mm-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.mm-product-name {
+  display: block;
+  font-size: 12px;
+  font-weight: 650;
+  color: #292541;
+  line-height: 1.3;
+}
+
+.mm-sku {
+  display: block;
+  font-size: 9.5px;
+  color: #8c889a;
+  margin-top: 2px;
+}
+
+.mm-qty {
+  font-size: 13px;
+  font-weight: 700;
+  color: #3ca579;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.mm-qty.negative {
+  color: #d96f6b;
+}
+
+.mm-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 8px;
+  font-size: 10px;
+  color: #777486;
+}
+
+.mm-location {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: #555164;
+  font-size: 10px;
+}
+
+.mm-subloc {
+  color: #8c889a;
+  font-size: 9.5px;
+}
+
+.mm-balance {
+  font-size: 10px;
+  color: #777486;
+}
+
+.mm-balance strong {
+  color: #292541;
+  font-weight: 650;
+}
+
+.mm-ref {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px dashed #eeedf3;
+  font-size: 9.5px;
+  color: #8c889a;
+}
+
+.mobile-state {
+  text-align: center;
+  padding: 24px 14px;
+  color: #aaa7b4;
+  font-size: 11px;
+}
+
+/* RESPONSIVE MEDIA QUERIES */
+@media (max-width: 768px) {
+  .page-heading {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 14px;
+    margin-bottom: 18px;
+  }
+
+  .heading-text h1 {
+    font-size: 20px;
+    line-height: 1.25;
+  }
+
+  .heading-text h1 span {
+    font-size: 18px;
+  }
+
+  .eyebrow {
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    margin-bottom: 5px;
+  }
+
+  .muted {
+    font-size: 11px;
+    margin-top: 5px;
+  }
+
+  .quick-actions-wrap {
+    width: 100%;
+  }
+
+  .quick-action-btn {
+    width: 100%;
+    height: 42px;
+    justify-content: center;
+    font-size: 12.5px;
+    border-radius: 8px;
+  }
+
+  .quick-actions-menu {
+    width: 100%;
+    left: 0;
+    right: 0;
+    top: calc(100% + 6px);
+    box-shadow: 0 12px 30px rgba(41, 37, 65, 0.16);
+    border-radius: 10px;
+    z-index: 60;
+  }
+
+  .metric-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+
+  .metric-card {
+    min-height: 114px;
+    padding: 13px 13px 12px;
+    border-radius: 9px;
+  }
+
+  .metric-card-top .metric-label {
+    font-size: 10.5px;
+    line-height: 1.3;
+  }
+
+  .metric-card-top .metric-icon {
+    width: 28px;
+    height: 28px;
+    border-radius: 7px;
+  }
+
+  .metric-card-top .metric-icon svg {
+    width: 14px;
+    height: 14px;
+  }
+
+  .metric-value {
+    font-size: 17.5px;
+    margin-top: 6px;
+    letter-spacing: -0.02em;
+  }
+
+  .unit-text {
+    font-size: 11px;
+  }
+
+  .metric-detail {
+    font-size: 9.5px;
+    margin-top: 6px;
+    line-height: 1.3;
+  }
+
+  .content-grid {
+    grid-template-columns: 1fr;
+    gap: 14px;
+    margin-bottom: 14px;
+  }
+
+  .panel-header {
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 14px 14px 0;
+  }
+
+  .panel-title-wrap {
+    flex: 1;
+    min-width: 160px;
+  }
+
+  .warehouse-selector-wrap {
+    width: 100%;
+  }
+
+  .select-button {
+    width: 100%;
+    justify-content: space-between;
+    height: 36px;
+    padding: 0 12px;
+    font-size: 11px;
+  }
+
+  .wh-btn-label {
+    max-width: none;
+    flex: 1;
+    text-align: left;
+  }
+
+  .warehouse-dropdown {
+    width: 100%;
+    left: 0;
+    right: 0;
+    top: calc(100% + 4px);
+  }
+
+  .chart-wrap {
+    padding: 14px 12px 12px;
+    min-height: 240px;
+  }
+
+  .chart-canvas {
+    min-height: 175px;
+  }
+
+  .chart-labels {
+    width: 28px;
+    font-size: 8.5px;
+  }
+
+  .chart {
+    margin-left: 10px;
+  }
+
+  .bars {
+    gap: 4px;
+  }
+
+  .bar-column {
+    min-width: 0;
+    flex: 1;
+    max-width: 44px;
+  }
+
+  .bar-column span {
+    font-size: 9px;
+  }
+
+  .bar.onhand {
+    width: 13px;
+    border-radius: 3px 3px 0 0;
+  }
+
+  .bar.reserved {
+    width: 8px;
+    transform: translateX(6px);
+    border-radius: 3px 3px 0 0;
+  }
+
+  .chart-legend {
+    flex-wrap: wrap;
+    gap: 8px 12px;
+    padding-top: 10px;
+    margin-top: 10px;
+    font-size: 9.5px;
+  }
+
+  .chart-footnote {
+    width: 100%;
+    margin-left: 0;
+    font-size: 9px;
+    margin-top: 2px;
+  }
+
+  .alerts-panel .alert-list {
+    padding: 10px 14px 4px;
+  }
+
+  .alerts-panel .alert-action-btn {
+    margin: 8px 14px 14px;
+    width: calc(100% - 28px);
+    height: 36px;
+    font-size: 11px;
+  }
+
+  .desktop-table-wrap {
+    display: none;
+  }
+
+  .mobile-activity-list {
+    display: flex;
+  }
+
+  .activity-panel-header {
+    padding: 14px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+}
+
+@media (max-width: 350px) {
+  .metric-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .metric-card {
+    min-height: 96px;
+  }
 }
 </style>

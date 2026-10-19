@@ -54,6 +54,7 @@ class ExternalReservationController extends Controller
                     'reservation_number' => 'RSV-'.now()->format('ymd').'-'.Str::upper(Str::random(6)),
                     'warehouse_id' => $data['warehouse_id'],
                     'status' => 'DRAFT',
+                    'reservation_date' => now()->toDateString(),
                     'expires_at' => $data['expires_at'] ?? null,
                     'remarks' => $data['remarks'] ?? null,
                     'created_by' => $credential->id,

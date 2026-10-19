@@ -38,10 +38,22 @@ class StockReservationController extends Controller
         }
 
         if ($startDate = $request->query('start_date')) {
-            $query->whereDate('created_at', '>=', $startDate);
+            $query->where(function ($q) use ($startDate) {
+                $q->whereDate('reservation_date', '>=', $startDate)
+                    ->orWhere(function ($sub) use ($startDate) {
+                        $sub->whereNull('reservation_date')
+                            ->whereDate('created_at', '>=', $startDate);
+                    });
+            });
         }
         if ($endDate = $request->query('end_date')) {
-            $query->whereDate('created_at', '<=', $endDate);
+            $query->where(function ($q) use ($endDate) {
+                $q->whereDate('reservation_date', '<=', $endDate)
+                    ->orWhere(function ($sub) use ($endDate) {
+                        $sub->whereNull('reservation_date')
+                            ->whereDate('created_at', '<=', $endDate);
+                    });
+            });
         }
 
         $sortBy = $request->input('sort_by');
@@ -52,10 +64,10 @@ class StockReservationController extends Controller
                 Warehouse::select('name')->whereColumn('warehouses.id', 'stock_reservations.warehouse_id'),
                 $sortDir
             );
-        } elseif (in_array($sortBy, ['reservation_number', 'status', 'created_at', 'expires_at'], true)) {
+        } elseif (in_array($sortBy, ['reservation_number', 'status', 'created_at', 'reservation_date', 'expires_at'], true)) {
             $query->orderBy($sortBy, $sortDir);
         } else {
-            $query->latest();
+            $query->latest('reservation_date')->latest('created_at');
         }
 
         $reservations = $query->paginate($request->query('per_page', 15));
@@ -93,6 +105,7 @@ class StockReservationController extends Controller
         $validated = $request->validate([
             'warehouse_id' => 'required|exists:warehouses,id',
             'status' => 'nullable|string',
+            'reservation_date' => 'nullable|date',
             'expires_at' => 'nullable|date',
             'remarks' => 'nullable|string',
             'items' => 'required|array|min:1',
@@ -108,6 +121,7 @@ class StockReservationController extends Controller
                 'reservation_number' => 'RSV-'.date('YmdHis').rand(10, 99),
                 'warehouse_id' => $validated['warehouse_id'],
                 'status' => $validated['status'] ?? 'DRAFT',
+                'reservation_date' => $validated['reservation_date'] ?? now()->toDateString(),
                 'expires_at' => $validated['expires_at'] ?? null,
                 'remarks' => $validated['remarks'] ?? null,
                 'created_by' => $request->user()?->id,

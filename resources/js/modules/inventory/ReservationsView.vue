@@ -25,8 +25,10 @@ const sortDir = ref<'asc' | 'desc'>('desc')
 
 const showAddModal = ref(false)
 const saving = ref(false)
+const getTodayDate = () => new Date().toISOString().slice(0, 10)
 const form = ref({
   warehouse_id: '',
+  reservation_date: getTodayDate(),
   product_id: '',
   quantity: '',
   remarks: '',
@@ -139,6 +141,7 @@ const fetchInitialData = async () => {
 const openAddModal = () => {
   form.value = {
     warehouse_id: '',
+    reservation_date: getTodayDate(),
     product_id: '',
     quantity: '',
     remarks: '',
@@ -154,6 +157,7 @@ const submit = async () => {
   try {
     await axios.post('/reservations', {
       warehouse_id: form.value.warehouse_id,
+      reservation_date: form.value.reservation_date || undefined,
       expires_at: form.value.expires_at || undefined,
       remarks: form.value.remarks || undefined,
       items: [{
@@ -444,7 +448,7 @@ const formatDate = (d: string) => {
               <AppSortableTh field="warehouse" :current-sort="sortBy" :current-dir="sortDir" @sort="handleSort">Gudang</AppSortableTh>
               <th style="padding: 10px 19px; text-align: left; color: #aaa7b4; font-size: 9px; font-weight: 600; text-transform: uppercase; background: #fafafd; border-top: 1px solid #f0eff3; border-bottom: 1px solid #f0eff3;">Kuantitas</th>
               <th style="padding: 10px 19px; text-align: left; color: #aaa7b4; font-size: 9px; font-weight: 600; text-transform: uppercase; background: #fafafd; border-top: 1px solid #f0eff3; border-bottom: 1px solid #f0eff3;">Diminta oleh</th>
-              <AppSortableTh field="created_at" :current-sort="sortBy" :current-dir="sortDir" @sort="handleSort">Tanggal</AppSortableTh>
+              <AppSortableTh field="reservation_date" :current-sort="sortBy" :current-dir="sortDir" @sort="handleSort">Tanggal</AppSortableTh>
               <AppSortableTh field="status" :current-sort="sortBy" :current-dir="sortDir" @sort="handleSort">Status</AppSortableTh>
               <th style="padding: 10px 19px; background: #fafafd; border-top: 1px solid #f0eff3; border-bottom: 1px solid #f0eff3; width: 40px;"></th>
             </tr>
@@ -469,7 +473,12 @@ const formatDate = (d: string) => {
                 {{ item.items && item.items.length ? (item.items[0].quantity + ' ' + (item.items[0].product?.unit?.symbol || '')) : '-' }}
               </td>
               <td>User ID: {{ item.created_by ? item.created_by.substring(0, 8) : '-' }}</td>
-              <td class="muted-cell">{{ formatDate(item.created_at) }}</td>
+              <td class="muted-cell">
+                <div>{{ formatDate(item.reservation_date || item.created_at) }}</div>
+                <small v-if="item.expires_at" style="font-size: 10px; color: #858291; display: block; margin-top: 2px;">
+                  Kedaluwarsa: {{ formatDate(item.expires_at) }}
+                </small>
+              </td>
               <td><span class="status-pill" :class="getStatusTone(item.status)">{{ getStatusLabel(item.status) }}</span></td>
               <td>
                 <button class="dots-button" aria-label="Aksi reservasi" @click.stop="toggleMenu($event, item.id)">
@@ -531,9 +540,22 @@ const formatDate = (d: string) => {
                   <small v-if="formErrors.warehouse_id" class="field-error">{{ formErrors.warehouse_id[0] }}</small>
                 </div>
                 <div class="form-group">
+                  <label>Tanggal Reservasi <span class="req">*</span></label>
+                  <input v-model="form.reservation_date" type="date" :class="{ 'input-error': formErrors.reservation_date }" />
+                  <small v-if="formErrors.reservation_date" class="field-error">{{ formErrors.reservation_date[0] }}</small>
+                </div>
+              </div>
+
+              <div class="form-row">
+                <div class="form-group">
                   <label>Tanggal Kedaluwarsa <span style="font-weight: 400; text-transform: none;">(Opsional)</span></label>
                   <input v-model="form.expires_at" type="date" :class="{ 'input-error': formErrors.expires_at }" />
                   <small v-if="formErrors.expires_at" class="field-error">{{ formErrors.expires_at[0] }}</small>
+                </div>
+                <div class="form-group">
+                  <label>Keterangan <span style="font-weight: 400; text-transform: none;">(Opsional)</span></label>
+                  <input v-model="form.remarks" type="text" placeholder="Catatan reservasi..." :class="{ 'input-error': formErrors.remarks }" />
+                  <small v-if="formErrors.remarks" class="field-error">{{ formErrors.remarks[0] }}</small>
                 </div>
               </div>
               
@@ -557,12 +579,6 @@ const formatDate = (d: string) => {
                   </div>
                 </div>
                 <small v-if="formErrors['items.0.product_id'] || formErrors['items.0.quantity']" class="field-error">Harap lengkapi produk dan kuantitas.</small>
-              </div>
-              
-              <div class="form-group">
-                <label>Keterangan <span style="font-weight: 400; text-transform: none;">(Opsional)</span></label>
-                <input v-model="form.remarks" type="text" placeholder="Catatan reservasi..." :class="{ 'input-error': formErrors.remarks }" />
-                <small v-if="formErrors.remarks" class="field-error">{{ formErrors.remarks[0] }}</small>
               </div>
               
               <div class="modal-footer">
@@ -595,11 +611,19 @@ const formatDate = (d: string) => {
                   <strong style="display: block; font-size: 11px; color: #48445c; margin-top: 6px;">{{ targetReservation?.warehouse?.name || '-' }}</strong>
                 </div>
                 <div>
+                  <span style="display: block; font-size: 9px; color: #aaa7b4; text-transform: uppercase; font-weight: 600;">Tanggal Reservasi</span>
+                  <strong style="display: block; font-size: 11px; color: #48445c; margin-top: 6px;">{{ formatDate(targetReservation?.reservation_date || targetReservation?.created_at) }}</strong>
+                </div>
+                <div>
+                  <span style="display: block; font-size: 9px; color: #aaa7b4; text-transform: uppercase; font-weight: 600;">Tanggal Kedaluwarsa</span>
+                  <strong style="display: block; font-size: 11px; color: #48445c; margin-top: 6px;">{{ targetReservation?.expires_at ? formatDate(targetReservation.expires_at) : '-' }}</strong>
+                </div>
+                <div>
                   <span style="display: block; font-size: 9px; color: #aaa7b4; text-transform: uppercase; font-weight: 600;">Dibuat Oleh</span>
                   <strong style="display: block; font-size: 11px; color: #48445c; margin-top: 6px;">{{ targetReservation?.created_by ? targetReservation.created_by.substring(0, 8) : '-' }}</strong>
                 </div>
                 <div>
-                  <span style="display: block; font-size: 9px; color: #aaa7b4; text-transform: uppercase; font-weight: 600;">Tanggal</span>
+                  <span style="display: block; font-size: 9px; color: #aaa7b4; text-transform: uppercase; font-weight: 600;">Waktu Input Sistem</span>
                   <strong style="display: block; font-size: 11px; color: #48445c; margin-top: 6px;">{{ formatDate(targetReservation?.created_at) }}</strong>
                 </div>
                 <div v-if="targetReservation?.remarks" style="grid-column: span 2; margin-top: 8px;">

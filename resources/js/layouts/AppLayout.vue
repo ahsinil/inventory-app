@@ -265,7 +265,7 @@ function handleKeyDown(e: KeyboardEvent) {
 // Click outside handler
 function handleDocumentClick(e: MouseEvent) {
   const target = e.target as HTMLElement
-  if (!target.closest('.user-card-wrap') && !target.closest('.user-menu-popover')) {
+  if (!target.closest('.user-card-wrap') && !target.closest('.user-menu-popover') && !target.closest('.top-user-wrap')) {
     showUserMenu.value = false
   }
   if (!target.closest('.workspace-switcher-wrap') && !target.closest('.workspace-menu-popover')) {
@@ -632,13 +632,49 @@ const currentHelpDescription = computed(() => {
             </Transition>
           </div>
 
-          <!-- TOPBAR USER AVATAR -->
-          <div
-            class="top-avatar"
-            @click="showUserMenu = !showUserMenu"
-            :title="authStore.user?.name"
-          >
-            {{ userInitial }}
+          <!-- TOPBAR USER AVATAR & DROPDOWN -->
+          <div class="top-user-wrap">
+            <div
+              class="top-avatar"
+              @click.stop="showUserMenu = !showUserMenu"
+              :title="authStore.user?.name"
+            >
+              {{ userInitial }}
+            </div>
+
+            <!-- TOPBAR USER DROPDOWN POPOVER -->
+            <Transition name="fade">
+              <div v-if="showUserMenu" class="user-menu-popover top-user-popover">
+                <div class="popover-user-head">
+                  <div class="avatar lg">{{ userInitial }}</div>
+                  <div>
+                    <strong>{{ authStore.user?.name }}</strong>
+                    <span class="user-email">{{ authStore.user?.email }}</span>
+                    <span class="role-badge">{{ userRole }}</span>
+                  </div>
+                </div>
+                <div class="popover-divider" />
+                <button
+                  class="popover-item"
+                  @click="go({ label: 'Pengaturan', icon: Settings, routeName: 'Settings' })"
+                >
+                  <UserIcon :size="14" />
+                  <span>Profil & Keamanan Akun</span>
+                </button>
+                <button
+                  class="popover-item"
+                  @click="showHelpModal = true; showUserMenu = false"
+                >
+                  <CircleHelp :size="14" />
+                  <span>Bantuan & Panduan Sistem</span>
+                </button>
+                <div class="popover-divider" />
+                <button class="popover-item danger" @click="handleLogout">
+                  <LogOut :size="14" />
+                  <span>Keluar dari Sistem</span>
+                </button>
+              </div>
+            </Transition>
           </div>
         </div>
       </header>
@@ -1739,12 +1775,202 @@ const currentHelpDescription = computed(() => {
   font-weight: 600;
 }
 
-@media (max-width: 700px) {
+.top-user-wrap {
+  position: relative;
+}
+
+.top-user-popover {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  left: auto;
+  bottom: auto;
+  width: 240px;
+  z-index: 120;
+}
+
+@media (max-width: 768px) {
+  .sidebar {
+    position: fixed !important;
+    left: 0 !important;
+    top: 0 !important;
+    bottom: 0 !important;
+    width: 280px !important;
+    max-width: 85vw !important;
+    flex: none !important;
+    transform: translateX(-100%) !important;
+    transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    z-index: 1000 !important;
+    box-shadow: none !important;
+    height: 100vh !important;
+    max-height: 100vh !important;
+    overflow-y: auto !important;
+  }
+
+  .sidebar.mobile-open {
+    transform: translateX(0) !important;
+    box-shadow: 0 0 40px rgba(0, 0, 0, 0.3) !important;
+  }
+
+  /* Keep full drawer layout on mobile even if collapsed was saved in desktop */
+  .sidebar.collapsed {
+    width: 280px !important;
+    max-width: 85vw !important;
+    padding: 18px 12px 14px !important;
+    flex: none !important;
+  }
+
+  .sidebar.collapsed .brand-row {
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    padding: 2px 6px 14px !important;
+    gap: 10px !important;
+  }
+
+  .sidebar.collapsed .brand-info,
+  .sidebar.collapsed .workspace-details,
+  .sidebar.collapsed .workspace-chevron,
+  .sidebar.collapsed .item-label,
+  .sidebar.collapsed .help-card,
+  .sidebar.collapsed .dots-button {
+    display: flex !important;
+  }
+
+  .sidebar.collapsed .group-title {
+    display: block !important;
+  }
+
+  .sidebar.collapsed .user-text {
+    display: flex !important;
+    flex-direction: column !important;
+  }
+
+  .sidebar.collapsed .group-divider {
+    display: none !important;
+  }
+
   .collapse-toggle-btn {
     display: none !important;
   }
+
   .mobile-close-btn {
     display: grid !important;
+  }
+
+  .scrim {
+    display: block !important;
+    position: fixed !important;
+    inset: 0 !important;
+    z-index: 999 !important;
+    background: rgba(41, 37, 65, 0.45) !important;
+    backdrop-filter: blur(2px) !important;
+    border: 0 !important;
+    cursor: pointer !important;
+  }
+
+  .main-content {
+    width: 100% !important;
+    min-width: 0 !important;
+    flex: 1 1 100% !important;
+  }
+
+  .topbar {
+    height: 58px !important;
+    padding: 0 14px !important;
+    gap: 8px !important;
+  }
+
+  .menu-toggle {
+    display: grid !important;
+    width: 32px !important;
+    height: 32px !important;
+    border-radius: 6px !important;
+    place-items: center !important;
+    cursor: pointer !important;
+  }
+
+  .breadcrumbs {
+    font-size: 11px !important;
+    min-width: 0 !important;
+    overflow: hidden !important;
+    white-space: nowrap !important;
+  }
+
+  .breadcrumbs span {
+    max-width: 80px !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    display: inline-block !important;
+    vertical-align: bottom !important;
+  }
+
+  .breadcrumbs strong {
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+
+  .top-actions {
+    gap: 6px !important;
+    margin-left: auto !important;
+    flex-shrink: 0 !important;
+  }
+
+  .search-box {
+    width: 32px !important;
+    height: 32px !important;
+    padding: 0 !important;
+    border: 0 !important;
+    background: transparent !important;
+    display: grid !important;
+    place-items: center !important;
+    cursor: pointer !important;
+  }
+
+  .search-box input,
+  .search-box kbd {
+    display: none !important;
+  }
+
+  .header-btn {
+    width: 32px !important;
+    height: 32px !important;
+  }
+
+  .top-avatar {
+    width: 30px !important;
+    height: 30px !important;
+    font-size: 10.5px !important;
+    flex-shrink: 0 !important;
+  }
+
+  .page-wrap {
+    padding: 18px 14px 22px !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  .notification-popover {
+    right: -8px !important;
+    width: 290px !important;
+    max-width: calc(100vw - 24px) !important;
+  }
+
+  .top-user-popover {
+    right: 0 !important;
+    width: 240px !important;
+    max-width: calc(100vw - 20px) !important;
+  }
+
+  footer {
+    flex-direction: column !important;
+    gap: 6px !important;
+    text-align: center !important;
+    align-items: center !important;
+    padding: 18px 0 24px !important;
+    font-size: 9.5px !important;
   }
 }
 </style>

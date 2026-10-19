@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { ChevronLeft, ChevronRight } from 'lucide-vue-next'
 
 const props = withDefaults(
   defineProps<{
@@ -23,40 +24,37 @@ const emit = defineEmits<{
   (e: 'update:page', page: number): void
 }>()
 
+/**
+ * Concise pagination numbers:
+ * - When lastPage <= 5: show all pages [1..lastPage]
+ * - When lastPage > 5:
+ *   - Near beginning (page <= 3): [1, 2, 3, '...', lastPage]
+ *   - Near end (page >= lastPage - 2): [1, '...', lastPage - 2, lastPage - 1, lastPage]
+ *   - In middle: [1, '...', page, '...', lastPage]
+ * Always <= 5 items so it never overflows or stretches too wide.
+ */
 const visiblePages = computed<(number | string)[]>(() => {
   const current = props.page
   const total = props.lastPage
-  const sibling = props.siblingCount
 
   if (total <= 1) return [1]
 
-  // If total pages is small (e.g. <= 7), show all pages
-  const totalNumbers = sibling * 2 + 5
-  if (total <= totalNumbers) {
+  if (total <= 5) {
     return Array.from({ length: total }, (_, i) => i + 1)
   }
 
-  const leftSibling = Math.max(current - sibling, 1)
-  const rightSibling = Math.min(current + sibling, total)
-
-  const showLeftEllipsis = leftSibling > 2
-  const showRightEllipsis = rightSibling < total - 1
-
-  if (!showLeftEllipsis && showRightEllipsis) {
-    const leftItemCount = 3 + 2 * sibling
-    const leftRange = Array.from({ length: leftItemCount }, (_, i) => i + 1)
-    return [...leftRange, '...', total]
+  // Near start
+  if (current <= 3) {
+    return [1, 2, 3, '...', total]
   }
 
-  if (showLeftEllipsis && !showRightEllipsis) {
-    const rightItemCount = 3 + 2 * sibling
-    const rightRange = Array.from({ length: rightItemCount }, (_, i) => total - rightItemCount + i + 1)
-    return [1, '...', ...rightRange]
+  // Near end
+  if (current >= total - 2) {
+    return [1, '...', total - 2, total - 1, total]
   }
 
-  // Show both ellipses
-  const middleRange = Array.from({ length: rightSibling - leftSibling + 1 }, (_, i) => leftSibling + i)
-  return [1, '...', ...middleRange, '...', total]
+  // In the middle
+  return [1, '...', current, '...', total]
 })
 
 const goTo = (p: number | string) => {
@@ -83,12 +81,13 @@ const goTo = (p: number | string) => {
     <div class="pagination-controls">
       <button
         type="button"
-        class="pagination-nav-button"
+        class="pagination-nav-button prev-btn"
         :disabled="page <= 1"
         title="Halaman Sebelumnya"
         @click="goTo(page - 1)"
       >
-        Sebelumnya
+        <ChevronLeft :size="14" class="nav-icon" />
+        <span class="nav-text">Sebelumnya</span>
       </button>
 
       <div class="pagination-pages">
@@ -111,12 +110,13 @@ const goTo = (p: number | string) => {
 
       <button
         type="button"
-        class="pagination-nav-button"
+        class="pagination-nav-button next-btn"
         :disabled="page >= lastPage"
         title="Halaman Berikutnya"
         @click="goTo(page + 1)"
       >
-        Berikutnya
+        <span class="nav-text">Berikutnya</span>
+        <ChevronRight :size="14" class="nav-icon" />
       </button>
     </div>
   </div>
@@ -125,35 +125,45 @@ const goTo = (p: number | string) => {
 <style scoped>
 .app-pagination-container {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: space-between;
-  padding: 14px 19px;
+  justify-content: center;
+  padding: 14px 18px;
   color: #858291;
   font-size: 11px;
   border-top: 1px solid #f0eff3;
-  flex-wrap: wrap;
-  gap: 12px;
+  gap: 10px;
+  width: 100%;
+  box-sizing: border-box;
+  text-align: center;
 }
 
 .pagination-info {
   color: #aaa7b4;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 500;
+  text-align: center;
 }
 
 .pagination-controls {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
+  flex-wrap: wrap;
 }
 
 .pagination-pages {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 4px;
 }
 
 .pagination-nav-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   border: 1px solid #e9e7ef;
   background: #ffffff;
   color: #555164;
@@ -165,6 +175,7 @@ const goTo = (p: number | string) => {
   transition: all 0.15s ease;
   user-select: none;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+  white-space: nowrap;
 }
 
 .pagination-nav-button:hover:not(:disabled) {
@@ -217,11 +228,43 @@ const goTo = (p: number | string) => {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 24px;
+  min-width: 20px;
   height: 28px;
   color: #aaa7b4;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
   user-select: none;
+}
+
+@media (min-width: 768px) {
+  .app-pagination-container {
+    position: relative;
+    flex-direction: row;
+    justify-content: center;
+    padding: 14px 20px;
+  }
+
+  .pagination-info {
+    position: absolute;
+    left: 20px;
+    text-align: left;
+  }
+
+  .pagination-controls {
+    margin: 0 auto;
+  }
+}
+
+@media (max-width: 380px) {
+  .pagination-nav-button {
+    padding: 5px 6px;
+    font-size: 10px;
+  }
+
+  .pagination-num-button {
+    min-width: 26px;
+    height: 26px;
+    font-size: 10.5px;
+  }
 }
 </style>

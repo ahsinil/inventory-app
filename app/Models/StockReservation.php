@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-#[Fillable(['company_id', 'reservation_number', 'warehouse_id', 'status', 'reference_type', 'reference_id', 'customer_id', 'expires_at', 'remarks', 'created_by'])]
+#[Fillable(['company_id', 'reservation_number', 'warehouse_id', 'status', 'reference_type', 'reference_id', 'customer_id', 'reservation_date', 'expires_at', 'remarks', 'created_by'])]
 class StockReservation extends Model
 {
     use Auditable, BelongsToCompany, HasUlid, SoftDeletes;
@@ -17,6 +17,7 @@ class StockReservation extends Model
     protected function casts(): array
     {
         return [
+            'reservation_date' => 'date',
             'expires_at' => 'datetime',
         ];
     }

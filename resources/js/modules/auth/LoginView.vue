@@ -8,8 +8,8 @@ const router = useRouter()
 const authStore = useAuthStore()
 
 const showPassword = ref(false)
-const email = ref('admin@example.com')
-const password = ref('password')
+const email = ref('')
+const password = ref('')
 const loading = ref(false)
 
 const onContinue = async () => {
@@ -54,8 +54,6 @@ const onContinue = async () => {
           {{ loading ? 'Masuk...' : 'Masuk' }} <ArrowRight v-if="!loading" :size="17" />
         </button>
       </form>
-      <div class="login-divider"><span>atau lanjutkan dengan</span></div>
-      <button class="sso-button" type="button"><span class="sso-icon">M</span> Lanjutkan dengan Meridian SSO</button>
       <p class="login-footnote">Dengan melanjutkan, Anda menyetujui <a href="#">Syarat Layanan</a> dan <a href="#">Kebijakan Privasi</a> Stockroom.</p>
     </div></section>
   </main>
