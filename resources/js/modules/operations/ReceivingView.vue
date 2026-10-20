@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import axios from 'axios'
-import { Plus, Search, Ellipsis, AlertTriangle, ArrowDownToLine, PackageOpen, CheckCircle2, Trash2, Eye, Building2, Warehouse as WarehouseIcon, Calendar, Check, X } from 'lucide-vue-next'
+import { Plus, Search, Ellipsis, AlertTriangle, ArrowDownToLine, PackageOpen, CheckCircle2, Trash2, Eye, Building2, Warehouse as WarehouseIcon, Calendar, Check, X, ScanLine } from 'lucide-vue-next'
 import DateRangePicker from '../../components/DateRangePicker.vue'
 import ProductCombobox from '../../components/forms/ProductCombobox.vue'
+import CameraScannerModal from '../../components/forms/CameraScannerModal.vue'
 import AppPagination from '../../components/ui/AppPagination.vue'
 import AppSortableTh from '../../components/ui/AppSortableTh.vue'
 
@@ -256,6 +257,22 @@ const posting = ref(false)
 const postErrors = ref<string>('')
 const activeReceipt = ref<Receipt | null>(null)
 const postForm = ref<{ items: { product_id: string; received_quantity: number; serial_numbers: string; has_sn: boolean }[] }>({ items: [] })
+
+// Scanner kamera untuk nomor seri
+const showScanner = ref(false)
+const activeScannerItem = ref<{ product_id: string; received_quantity: number; serial_numbers: string; has_sn: boolean } | null>(null)
+
+const openScannerForItem = (item: any) => {
+  activeScannerItem.value = item
+  showScanner.value = true
+}
+
+const handleScannerComplete = (serials: string[]) => {
+  if (activeScannerItem.value) {
+    activeScannerItem.value.serial_numbers = serials.join(', ')
+    showToast(`${serials.length} nomor seri berhasil dimasukkan`, 'success')
+  }
+}
 
 const openPost = async (r: Receipt) => {
   closeDropdown()
@@ -561,9 +578,29 @@ onUnmounted(() => {
                 </div>
                 
                 <div v-if="item.has_sn" style="border-top: 1px dashed #e9e7ef; padding-top: 12px;">
-                  <label style="display: block; font-size: 10px; font-weight: 600; color: #858291; text-transform: uppercase; margin-bottom: 6px;">Nomor Seri (Pisahkan dengan koma)</label>
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                    <label style="font-size: 10px; font-weight: 600; color: #858291; text-transform: uppercase; margin: 0;">Nomor Seri (Pisahkan dengan koma)</label>
+                    <button
+                      type="button"
+                      class="sn-scan-btn-small"
+                      title="Pindai nomor seri dengan kamera perangkat"
+                      @click="openScannerForItem(item)"
+                    >
+                      <ScanLine :size="13" />
+                      <span>Scan Kamera</span>
+                    </button>
+                  </div>
                   <input v-model="item.serial_numbers" type="text" placeholder="Contoh: SN-001, SN-002, SN-003" style="width: 100%; padding: 10px 14px; border: 1px solid #e9e7ef; border-radius: 8px; font-size: 12px; background: #fafafd; outline: none; color: #48445c;" />
-                  <small style="color: #aaa7b4; font-size: 9px; display: block; margin-top: 6px;">Jumlah seri harus persis sama dengan Qty Diterima.</small>
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 6px;">
+                    <small style="color: #aaa7b4; font-size: 9px;">Jumlah seri harus persis sama dengan Qty Diterima.</small>
+                    <small
+                      v-if="item.serial_numbers"
+                      style="font-size: 9px; font-weight: 600;"
+                      :style="{ color: item.serial_numbers.split(',').map((s: string) => s.trim()).filter(Boolean).length === Number(item.received_quantity) ? '#3b9d76' : '#bd3c3c' }"
+                    >
+                      {{ item.serial_numbers.split(',').map((s: string) => s.trim()).filter(Boolean).length }} / {{ item.received_quantity }} terisi
+                    </small>
+                  </div>
                 </div>
               </div>
 
@@ -753,10 +790,39 @@ onUnmounted(() => {
         </div>
       </Transition>
     </Teleport>
+
+    <CameraScannerModal
+      v-model="showScanner"
+      mode="multi"
+      :title="'Scan Nomor Seri: ' + (products.find(p => p.id === activeScannerItem?.product_id)?.name || 'Barang')"
+      :subtitle="'Arahkan kamera ke barcode/QR nomor seri perangkat (Target: ' + (activeScannerItem?.received_quantity || 0) + ' item).'"
+      :target-quantity="Number(activeScannerItem?.received_quantity || 0)"
+      :initial-values="activeScannerItem?.serial_numbers ? activeScannerItem.serial_numbers.split(',').map((s: string) => s.trim()).filter(Boolean) : []"
+      @complete="handleScannerComplete"
+    />
   </section>
 </template>
 
 <style scoped>
+.sn-scan-btn-small {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border: 1px solid #dcd8ec;
+  border-radius: 6px;
+  background: linear-gradient(135deg, #f4f1ff, #ebe6ff);
+  color: #4b3fa0;
+  font-weight: 600;
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.sn-scan-btn-small:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 3px 8px rgba(91, 75, 201, 0.18);
+}
+
 .receiving-page { display: block; }
 .panel { overflow: hidden; }
 .status-pill.success { color: #3b9d76; background: #eaf8f1; }

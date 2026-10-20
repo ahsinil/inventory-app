@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import axios from 'axios'
-import { MoreHorizontal, Plus, Search, ChevronDown, AlertTriangle } from 'lucide-vue-next'
+import { MoreHorizontal, Plus, Search, ChevronDown, AlertTriangle, ScanLine } from 'lucide-vue-next'
 import DateRangePicker from '../../components/DateRangePicker.vue'
 import ProductCombobox from '../../components/forms/ProductCombobox.vue'
+import CameraScannerModal from '../../components/forms/CameraScannerModal.vue'
 import AppPagination from '../../components/ui/AppPagination.vue'
 import AppSortableTh from '../../components/ui/AppSortableTh.vue'
 
@@ -37,6 +38,22 @@ const form = ref({
 const formErrors = ref<Record<string, string[]>>({})
 const availableProducts = ref<any[]>([])
 const fetchingProducts = ref(false)
+
+// Scanner kamera untuk nomor seri pemenuhan reservasi
+const showScanner = ref(false)
+const activeScannerItem = ref<any>(null)
+
+const openScannerForItem = (item: any) => {
+  activeScannerItem.value = item
+  showScanner.value = true
+}
+
+const handleScannerComplete = (serials: string[]) => {
+  if (activeScannerItem.value) {
+    activeScannerItem.value.input_serial_numbers = serials.join('\n')
+    showToast(`${serials.length} nomor seri berhasil dimasukkan`, 'success')
+  }
+}
 
 watch(() => form.value.warehouse_id, async (newVal) => {
   if (!newVal) {
@@ -699,9 +716,29 @@ const formatDate = (d: string) => {
 
             <div v-if="targetReservation?.items?.some(i => i.product?.has_serial_number)" style="text-align: left; margin-bottom: 20px; background: #fafafd; padding: 12px; border-radius: 8px; border: 1px solid #e9e7ef;">
               <p style="font-size: 11px; color: #858291; margin: 0 0 10px;">Beberapa barang membutuhkan Serial Number (pisahkan dengan koma atau enter):</p>
-              <div v-for="item in targetReservation.items.filter(i => i.product?.has_serial_number)" :key="item.id" style="margin-bottom: 10px;">
-                <label style="display: block; font-size: 10px; font-weight: 600; color: #48445c; margin-bottom: 4px;">{{ item.product?.name }} (Butuh {{ item.quantity }})</label>
+              <div v-for="item in targetReservation.items.filter(i => i.product?.has_serial_number)" :key="item.id" style="margin-bottom: 12px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                  <label style="font-size: 10px; font-weight: 600; color: #48445c; margin: 0;">{{ item.product?.name }} (Butuh {{ item.quantity }})</label>
+                  <button
+                    type="button"
+                    class="sn-scan-btn-small"
+                    title="Pindai nomor seri dengan kamera perangkat"
+                    @click="openScannerForItem(item)"
+                  >
+                    <ScanLine :size="13" />
+                    <span>Scan Kamera</span>
+                  </button>
+                </div>
                 <textarea v-model="item.input_serial_numbers" class="modern-input" placeholder="SN123&#10;SN124..." style="padding: 8px 10px; font-size: 11px; width: 100%; min-height: 80px; resize: vertical; font-family: monospace;"></textarea>
+                <div style="display: flex; justify-content: flex-end; margin-top: 4px;">
+                  <small
+                    v-if="item.input_serial_numbers"
+                    style="font-size: 9px; font-weight: 600;"
+                    :style="{ color: item.input_serial_numbers.split(/[\n,]+/).map((s: string) => s.trim()).filter(Boolean).length === Number(item.quantity) ? '#3b9d76' : '#bd3c3c' }"
+                  >
+                    {{ item.input_serial_numbers.split(/[\n,]+/).map((s: string) => s.trim()).filter(Boolean).length }} / {{ item.quantity }} terisi
+                  </small>
+                </div>
               </div>
             </div>
 
@@ -754,10 +791,38 @@ const formatDate = (d: string) => {
         </div>
       </Transition>
     </Teleport>
+
+    <CameraScannerModal
+      v-model="showScanner"
+      mode="multi"
+      :title="'Scan Nomor Seri Reservasi: ' + (activeScannerItem?.product?.name || 'Barang')"
+      :subtitle="'Arahkan kamera ke barcode/QR nomor seri perangkat (Target: ' + (activeScannerItem?.quantity || 0) + ' item).'"
+      :target-quantity="Number(activeScannerItem?.quantity || 0)"
+      :initial-values="activeScannerItem?.input_serial_numbers ? activeScannerItem.input_serial_numbers.split(/[\n,]+/).map((s: string) => s.trim()).filter(Boolean) : []"
+      @complete="handleScannerComplete"
+    />
   </section>
 </template>
 
 <style scoped>
+.sn-scan-btn-small {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border: 1px solid #dcd8ec;
+  border-radius: 6px;
+  background: linear-gradient(135deg, #f4f1ff, #ebe6ff);
+  color: #4b3fa0;
+  font-weight: 600;
+  font-size: 10px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.sn-scan-btn-small:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 3px 8px rgba(91, 75, 201, 0.18);
+}
 /* Modal Transition */
 .fade-enter-active,.fade-leave-active{transition:opacity .25s ease}.fade-enter-from,.fade-leave-to{opacity:0}
 .fade-enter-active .modal-content{transition:all .3s cubic-bezier(.34,1.56,.64,1)}.fade-enter-from .modal-content{transform:translateY(20px) scale(.95);opacity:0}.fade-leave-to .modal-content{transform:translateY(10px);opacity:0}

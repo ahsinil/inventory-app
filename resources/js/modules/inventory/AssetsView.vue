@@ -1,29 +1,37 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
 import axios from 'axios'
-import { Html5Qrcode } from 'html5-qrcode'
-import { Ellipsis, Plus, Search, ShieldCheck, ChevronDown, X, ScanLine, AlertTriangle } from 'lucide-vue-next'
+import { Ellipsis, Plus, Search, ShieldCheck, ChevronDown, X, ScanLine, AlertTriangle, Download } from 'lucide-vue-next'
 import DateRangePicker from '../../components/DateRangePicker.vue'
 import ProductCombobox from '../../components/forms/ProductCombobox.vue'
+import CameraScannerModal from '../../components/forms/CameraScannerModal.vue'
 import AppPagination from '../../components/ui/AppPagination.vue'
 import AppSortableTh from '../../components/ui/AppSortableTh.vue'
 
 // --- Scanner kamera untuk Nomor Seri ---
 const showScanner = ref(false)
-const scannerError = ref('')
-let scanner: Html5Qrcode | null = null
+const scannerTarget = ref<'form' | 'search'>('form')
 
-const stopScanner = async () => {
-  if (scanner) {
-    try { if (scanner.isScanning) await scanner.stop() } catch (e) { /* abaikan */ }
-    try { scanner.clear() } catch (e) { /* abaikan */ }
-    scanner = null
-  }
-  showScanner.value = false
+const openScannerForForm = () => {
+  scannerTarget.value = 'form'
+  showScanner.value = true
 }
 
-const cameraList = ref<{ id: string; label: string }[]>([])
-const selectedCameraId = ref('')
+const openScannerForSearch = () => {
+  scannerTarget.value = 'search'
+  showScanner.value = true
+}
+
+const handleScannedSerial = (scannedText: string) => {
+  if (scannerTarget.value === 'form') {
+    form.value.serial_number = scannedText
+    showToast(`S/N ${scannedText} berhasil dipindai!`, 'success')
+  } else {
+    search.value = scannedText
+    onSearch()
+    showToast(`Mencari aset S/N ${scannedText}`, 'success')
+  }
+}
 
 const toastMessage = ref('')
 const toastType = ref('error')
@@ -32,85 +40,6 @@ const showToast = (msg: string, type: string = 'error') => {
   toastType.value = type
   setTimeout(() => { toastMessage.value = '' }, 3000)
 }
-
-const runCamera = async () => {
-  scannerError.value = ''
-  if (scanner) {
-    try { if (scanner.isScanning) await scanner.stop() } catch (e) { /* abaikan */ }
-  } else {
-    scanner = new Html5Qrcode('sn-scanner-region')
-  }
-  try {
-    await scanner.start(
-      selectedCameraId.value,
-      { fps: 10, qrbox: { width: 260, height: 160 } },
-      (text: string) => {
-        form.value.serial_number = text.trim()
-        stopScanner()
-      },
-      () => {}
-    )
-    localStorage.setItem('sn_camera_id', selectedCameraId.value)
-  } catch (err: any) {
-    scannerError.value = 'Kamera tidak dapat dibuka: ' + String(err?.message || err)
-  }
-}
-
-const startScanner = async () => {
-  scannerError.value = ''
-  showScanner.value = true
-  await nextTick()
-  try {
-    if (!navigator.mediaDevices?.getUserMedia) {
-      throw new Error('Browser tidak mendukung kamera atau halaman tidak aman (butuh HTTPS/localhost).')
-    }
-    // Minta izin dulu agar daftar kamera terisi lengkap
-    const probe = await Promise.race([
-      navigator.mediaDevices.getUserMedia({ video: true }),
-      new Promise<never>((_, rej) => setTimeout(() => rej(new Error(
-        'TIMEOUT: browser tidak merespons permintaan kamera (tidak ada prompt izin). Cek izin kamera Arc & macOS, atau gunakan tombol "Scan dari Foto" di bawah.'
-      )), 8000)),
-    ])
-    probe.getTracks().forEach(t => t.stop())
-
-    const all = await Html5Qrcode.getCameras()
-    if (!all.length) throw new Error('Tidak ada kamera yang terdeteksi.')
-    const real = all.filter(c => !/obs|virtual|snap|camo|ndi|manycam/i.test(c.label))
-    cameraList.value = real.length ? real : all
-    const back = cameraList.value.find(c => /back|rear|environment|belakang/i.test(c.label))
-    const saved = localStorage.getItem('sn_camera_id')
-    const preferred = cameraList.value.find(c => c.id === saved)
-    selectedCameraId.value = (preferred || back || cameraList.value[0]).id
-    await runCamera()
-  } catch (err: any) {
-    const msg = String(err?.message || err)
-    scannerError.value = /permission|denied|NotAllowed/i.test(msg)
-      ? 'Akses kamera ditolak. Izinkan kamera di pengaturan browser, lalu coba lagi.'
-      : (!window.isSecureContext
-          ? 'Kamera hanya bisa dipakai lewat HTTPS atau localhost.'
-          : 'Kamera tidak dapat dibuka: ' + msg)
-  }
-}
-
-// Fallback: scan dari foto/file (tanpa izin kamera live)
-const scanFromFile = async (e: Event) => {
-  const file = (e.target as HTMLInputElement).files?.[0]
-  if (!file) return
-  scannerError.value = ''
-  try {
-    if (scanner) { try { if (scanner.isScanning) await scanner.stop() } catch (_) {} }
-    const reader = new Html5Qrcode('sn-scanner-region', false)
-    const text = await reader.scanFile(file, false)
-    form.value.serial_number = text.trim()
-    showScanner.value = false
-  } catch (err: any) {
-    scannerError.value = 'Barcode tidak terbaca pada foto. Coba foto yang lebih jelas dan dekat.'
-  } finally {
-    (e.target as HTMLInputElement).value = ''
-  }
-}
-
-onBeforeUnmount(() => { stopScanner() })
 
 const assets = ref<any[]>([])
 const stats = ref({ total_assets: 0, in_stock: 0, assigned: 0, maintenance: 0 })
@@ -475,9 +404,21 @@ const formatDate = (d: string) => {
             </button>
           </div>
           
-          <div class="rsv-search" style="margin-left: auto;">
-            <Search :size="14" class="icon" />
-            <input v-model="search" @input="onSearch" placeholder="Cari aset..." aria-label="Cari aset" />
+          <div class="rsv-search" style="margin-left: auto; display: flex; align-items: center; gap: 6px;">
+            <div style="position: relative;">
+              <Search :size="14" class="icon" />
+              <input v-model="search" @input="onSearch" placeholder="Cari aset..." aria-label="Cari aset" />
+            </div>
+            <button
+              type="button"
+              class="sn-scan-btn"
+              style="padding: 7px 12px; height: 33px; font-size: 11px;"
+              title="Pindai barcode untuk mencari aset"
+              @click="openScannerForSearch"
+            >
+              <ScanLine :size="14" />
+              <span>Scan S/N</span>
+            </button>
           </div>
         </div>
       </div>
@@ -542,32 +483,13 @@ const formatDate = (d: string) => {
       </AppPagination>
     </div>
     
-    <Teleport to="body">
-      <Transition name="fade">
-        <div v-if="showScanner" class="modal-backdrop scanner-backdrop" @click="stopScanner">
-          <div class="modal-content scanner-card" @click.stop>
-            <div class="modal-header">
-              <h2>Scan Nomor Seri</h2>
-              <p>Arahkan kamera ke barcode atau QR code pada perangkat.</p>
-            </div>
-            <div id="sn-scanner-region" class="scanner-region"></div>
-            <div v-if="cameraList.length > 1" class="scanner-actions" style="padding-bottom:12px">
-              <select v-model="selectedCameraId" @change="runCamera" style="width:100%;padding:8px;border:1px solid #dcd8ec;border-radius:8px">
-                <option v-for="c in cameraList" :key="c.id" :value="c.id">{{ c.label || c.id }}</option>
-              </select>
-            </div>
-            <div v-if="scannerError" class="field-error scanner-error">{{ scannerError }}</div>
-            <div class="scanner-actions">
-              <label class="sn-scan-btn" style="padding:8px 16px;margin-right:auto">
-                <ScanLine :size="16" /> Scan dari Foto
-                <input type="file" accept="image/*" capture="environment" hidden @change="scanFromFile" />
-              </label>
-              <button type="button" class="sn-scan-btn" @click="stopScanner"><X :size="16" /> Tutup</button>
-            </div>
-          </div>
-        </div>
-      </Transition>
-    </Teleport>
+    <CameraScannerModal
+      v-model="showScanner"
+      mode="single"
+      :title="scannerTarget === 'form' ? 'Scan Nomor Seri Aset' : 'Cari Aset via Scan'"
+      :subtitle="scannerTarget === 'form' ? 'Arahkan kamera ke barcode atau QR code nomor seri perangkat.' : 'Arahkan kamera ke barcode/QR untuk mencari aset.'"
+      @scan="handleScannedSerial"
+    />
 
     <Teleport to="body">
       <Transition name="fade">
@@ -585,7 +507,7 @@ const formatDate = (d: string) => {
                 <label>Nomor Seri (S/N) <span class="req">*</span></label>
                 <div class="sn-input-row">
                   <input v-model="form.serial_number" type="text" placeholder="Ketik atau scan S/N..." :class="{ 'input-error': formErrors.serial_number }" />
-                  <button type="button" class="sn-scan-btn" title="Scan dengan kamera" @click="startScanner"><ScanLine :size="16" /> Scan</button>
+                  <button type="button" class="sn-scan-btn" title="Scan dengan kamera" @click="openScannerForForm"><ScanLine :size="16" /> Scan</button>
                 </div>
                 <small v-if="formErrors.serial_number" class="field-error">{{ formErrors.serial_number[0] }}</small>
               </div>
@@ -776,14 +698,7 @@ const formatDate = (d: string) => {
 .sn-input-row input{flex:1;min-width:0}
 .sn-scan-btn{display:inline-flex;align-items:center;gap:6px;padding:0 14px;height:auto;border:1px solid #dcd8ec;border-radius:8px;background:linear-gradient(135deg,#f4f1ff,#ebe6ff);color:#4b3fa0;font-weight:600;font-size:13px;cursor:pointer;transition:all .2s}
 .sn-scan-btn:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(91,75,201,.2)}
-.scanner-backdrop{z-index:10001}
-.scanner-card{max-width:440px;width:92vw}
-.scanner-region{width:100%;min-height:240px;border-radius:12px;overflow:hidden;background:#14122b;margin:12px 24px;width:calc(100% - 48px)}
-.scanner-region video{width:100%!important;object-fit:cover}
-.scanner-error{margin-bottom:10px;font-size:12px;background:#fffafb;padding:10px;border:1px solid #d47770;border-radius:6px}
-.scanner-actions{display:flex;justify-content:flex-end;padding:0 24px 20px}
-.scanner-error{margin-left:24px;margin-right:24px}
-.scanner-actions .sn-scan-btn{padding:8px 16px}
+
 
 /* Toast */
 .toast-notification { position: fixed; bottom: 24px; right: 24px; padding: 12px 20px; border-radius: 8px; font-size: 12px; font-weight: 500; z-index: 10001; box-shadow: 0 10px 30px rgba(0,0,0,0.1); color: #fff; max-width: 300px; display: flex; align-items: center; gap: 10px; }

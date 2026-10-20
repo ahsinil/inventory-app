@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import axios from 'axios'
-import { Plus, Search, Ellipsis, ArrowDownLeft, CheckCircle2, PackageCheck } from 'lucide-vue-next'
+import { Plus, Search, Ellipsis, ArrowDownLeft, CheckCircle2, PackageCheck, ScanLine } from 'lucide-vue-next'
 import DateRangePicker from '../../components/DateRangePicker.vue'
 import ProductCombobox from '../../components/forms/ProductCombobox.vue'
+import CameraScannerModal from '../../components/forms/CameraScannerModal.vue'
 import AppPagination from '../../components/ui/AppPagination.vue'
 import AppSortableTh from '../../components/ui/AppSortableTh.vue'
 
@@ -212,6 +213,22 @@ interface PostItem {
   has_sn: boolean
 }
 const postForm = ref<{ items: PostItem[] }>({ items: [] })
+
+// Scanner kamera untuk nomor seri retur
+const showScanner = ref(false)
+const activeScannerItem = ref<PostItem | null>(null)
+
+const openScannerForItem = (item: PostItem) => {
+  activeScannerItem.value = item
+  showScanner.value = true
+}
+
+const handleScannerComplete = (serials: string[]) => {
+  if (activeScannerItem.value) {
+    activeScannerItem.value.serial_numbers = serials.join(', ')
+    showToast(`${serials.length} nomor seri berhasil dimasukkan`, 'success')
+  }
+}
 
 const openPost = async (r: StockReturn) => {
   closeDropdown()
@@ -482,7 +499,18 @@ onUnmounted(() => {
                     </select>
                   </div>
                   <div style="flex: 1;" v-if="item.has_sn">
-                    <label style="font-size: 10px; color: #aaa7b5; display: block; margin-bottom: 4px;">Serial Numbers (Pisahkan dgn koma)</label>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                      <label style="font-size: 10px; color: #aaa7b5; margin: 0;">Serial Numbers (Pisahkan dgn koma)</label>
+                      <button
+                        type="button"
+                        class="sn-scan-btn-small"
+                        title="Pindai nomor seri dengan kamera perangkat"
+                        @click="openScannerForItem(item)"
+                      >
+                        <ScanLine :size="13" />
+                        <span>Scan Kamera</span>
+                      </button>
+                    </div>
                     <input v-model="item.serial_numbers" class="form-input" placeholder="SN-1, SN-2..." />
                   </div>
                 </div>
@@ -506,10 +534,39 @@ onUnmounted(() => {
         </div>
       </Transition>
     </Teleport>
+
+    <CameraScannerModal
+      v-model="showScanner"
+      mode="multi"
+      :title="'Scan Nomor Seri Retur: ' + (products.find(p => p.id === activeScannerItem?.product_id)?.name || 'Barang')"
+      :subtitle="'Arahkan kamera ke barcode/QR nomor seri barang yang diretur.'"
+      :target-quantity="activeReturn?.items?.find(i => i.product_id === activeScannerItem?.product_id)?.quantity"
+      :initial-values="activeScannerItem?.serial_numbers ? activeScannerItem.serial_numbers.split(',').map((s: string) => s.trim()).filter(Boolean) : []"
+      @complete="handleScannerComplete"
+    />
   </section>
 </template>
 
 <style scoped>
+.sn-scan-btn-small {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border: 1px solid #dcd8ec;
+  border-radius: 6px;
+  background: linear-gradient(135deg, #f4f1ff, #ebe6ff);
+  color: #4b3fa0;
+  font-weight: 600;
+  font-size: 10px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.sn-scan-btn-small:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 3px 8px rgba(91, 75, 201, 0.18);
+}
+
 .page-heading { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 24px; }
 .eyebrow { font-size: 10px; font-weight: 600; color: #aaa7b5; letter-spacing: 0.05em; margin-bottom: 6px; }
 .page-heading h1 { font-size: 24px; font-weight: 600; color: #292541; letter-spacing: -0.02em; margin: 0 0 4px; }
