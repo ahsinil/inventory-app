@@ -577,9 +577,9 @@ const formatDate = (d: string) => {
               </div>
               
               <div class="form-group">
-                <label>Daftar Barang <span class="req">*</span></label>
-                <div style="display: flex; gap: 14px;">
-                  <div style="flex: 1;">
+                <label>Daftar Barang & Kuantitas <span class="req">*</span></label>
+                <div class="reservation-item-row">
+                  <div class="item-combobox-col">
                     <ProductCombobox
                       v-model="form.product_id"
                       :products="availableProducts"
@@ -588,11 +588,22 @@ const formatDate = (d: string) => {
                       :placeholder="!form.warehouse_id ? 'Pilih gudang terlebih dahulu' : (fetchingProducts ? 'Memuat produk...' : (availableProducts.length === 0 ? 'Tidak ada stok di gudang ini' : 'Ketik nama barang atau SKU...'))"
                     />
                   </div>
-                  <div style="width: 130px; position: relative;">
-                    <input v-model.number="form.quantity" type="number" min="0" step="any" placeholder="1" :class="{ 'input-error': formErrors['items.0.quantity'] }" :style="{ paddingRight: selectedProductUnit ? '46px' : '14px' }" />
-                    <span v-if="selectedProductUnit" style="position: absolute; right: 14px; top: 50%; transform: translateY(-50%); font-size: 11px; font-weight: 600; color: #aaa7b4; pointer-events: none;">
-                      {{ selectedProductUnit }}
-                    </span>
+                  <div class="item-qty-col">
+                    <div class="qty-field-wrap">
+                      <input
+                        v-model.number="form.quantity"
+                        type="number"
+                        min="0"
+                        step="any"
+                        placeholder="Jumlah (cth: 1)"
+                        aria-label="Jumlah kuantitas"
+                        :class="{ 'input-error': formErrors['items.0.quantity'] }"
+                        :style="{ paddingRight: selectedProductUnit ? '56px' : '14px' }"
+                      />
+                      <span v-if="selectedProductUnit" class="qty-unit-pill">
+                        {{ selectedProductUnit }}
+                      </span>
+                    </div>
                   </div>
                 </div>
                 <small v-if="formErrors['items.0.product_id'] || formErrors['items.0.quantity']" class="field-error">Harap lengkapi produk dan kuantitas.</small>
@@ -873,6 +884,111 @@ const formatDate = (d: string) => {
 .toast-notification { position: fixed; bottom: 24px; right: 24px; padding: 12px 20px; border-radius: 8px; font-size: 12px; font-weight: 500; z-index: 10001; box-shadow: 0 10px 30px rgba(0,0,0,0.1); color: #fff; max-width: 300px; display: flex; align-items: center; gap: 10px; }
 .toast-notification.success { background: #292541; }
 .toast-notification.error { background: #d47770; }
+
+/* Item Row & Qty Responsiveness */
+.reservation-item-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  width: 100%;
+}
+
+.item-combobox-col {
+  flex: 1;
+  min-width: 0;
+}
+
+.item-qty-col {
+  width: 130px;
+  flex-shrink: 0;
+}
+
+.qty-field-wrap {
+  position: relative;
+  width: 100%;
+}
+
+.qty-field-wrap input {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.qty-unit-pill {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 10px;
+  font-weight: 700;
+  color: #6d697d;
+  background: #eeedf3;
+  padding: 3px 6px;
+  border-radius: 4px;
+  pointer-events: none;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+/* Mobile responsive adjustments */
+@media (max-width: 640px) {
+  .modal-backdrop {
+    padding: 12px;
+  }
+
+  .modal-content {
+    max-width: 100% !important;
+    width: 100% !important;
+    border-radius: 14px;
+    max-height: 92vh;
+    overflow-y: auto;
+  }
+
+  .modal-header {
+    padding: 18px 20px 14px;
+  }
+
+  .modern-form {
+    padding: 18px 20px 22px;
+    gap: 14px;
+  }
+
+  .form-row {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .reservation-item-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .item-combobox-col {
+    width: 100%;
+  }
+
+  .item-qty-col {
+    width: 100%;
+  }
+
+  .qty-field-wrap input {
+    height: 40px;
+    font-size: 13px;
+  }
+
+  .modal-footer {
+    flex-direction: column-reverse;
+    gap: 8px;
+    margin-top: 6px;
+    padding-top: 14px;
+  }
+
+  .modal-footer button {
+    width: 100%;
+    justify-content: center;
+    padding: 11px;
+  }
+}
 </style>
 
 

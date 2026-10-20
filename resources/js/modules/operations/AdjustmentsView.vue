@@ -592,4 +592,39 @@ onUnmounted(() => document.removeEventListener('click', closeDropdown))
 .toast-notification.success { background: #292541; }
 .toast-notification.error { background: #d47770; }
 .toast-notification.warning { background: #c48735; }
+
+@media (max-width: 640px) {
+  .modal-backdrop {
+    padding: 12px;
+  }
+  .modal-content {
+    max-width: 100% !important;
+    width: 100% !important;
+    border-radius: 14px;
+    max-height: 92vh;
+    overflow-y: auto;
+  }
+  .form-row {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  .item-bottom {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+  .qty-box {
+    width: 100%;
+    justify-content: space-between;
+    box-sizing: border-box;
+  }
+  .modal-footer {
+    flex-direction: column-reverse;
+    gap: 8px;
+  }
+  .modal-footer button {
+    width: 100%;
+    justify-content: center;
+  }
+}
 </style>

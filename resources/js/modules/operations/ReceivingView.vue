@@ -1113,4 +1113,51 @@ onUnmounted(() => {
 .detail-table tr:last-child td {
   border-bottom: none;
 }
+
+@media (max-width: 640px) {
+  .modal-backdrop {
+    padding: 12px;
+  }
+  .modal-content {
+    max-width: 100% !important;
+    width: 100% !important;
+    border-radius: 14px;
+    max-height: 92vh;
+    overflow-y: auto;
+  }
+  .form-row {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  .items-table-header {
+    display: none;
+  }
+  .item-row {
+    flex-wrap: wrap;
+    background: #fafafd;
+    border: 1px solid #e9e7ef;
+    border-radius: 8px;
+    padding: 10px;
+    gap: 8px;
+  }
+  .col-product {
+    width: 100%;
+    flex: 1 1 100%;
+  }
+  .col-qty {
+    flex: 1;
+    width: auto;
+  }
+  .col-action {
+    flex-shrink: 0;
+  }
+  .modal-footer {
+    flex-direction: column-reverse;
+    gap: 8px;
+  }
+  .modal-footer button {
+    width: 100%;
+    justify-content: center;
+  }
+}
 </style>

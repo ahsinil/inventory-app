@@ -97,20 +97,29 @@ const updatePosition = () => {
   const spaceBelow = window.innerHeight - rect.bottom
   const dropdownHeight = 250
 
+  const screenW = window.innerWidth
+  const padding = 12
+  const targetWidth = Math.max(rect.width, 280)
+  const finalWidth = Math.min(targetWidth, screenW - padding * 2)
+  let leftPos = rect.left
+  if (leftPos + finalWidth > screenW - padding) {
+    leftPos = Math.max(padding, screenW - padding - finalWidth)
+  }
+
   if (spaceBelow < dropdownHeight && rect.top > dropdownHeight) {
     dropdownStyle.value = {
       position: 'fixed',
       bottom: `${window.innerHeight - rect.top + 4}px`,
-      left: `${rect.left}px`,
-      width: `${Math.max(rect.width, 320)}px`,
+      left: `${leftPos}px`,
+      width: `${finalWidth}px`,
       zIndex: '10005',
     }
   } else {
     dropdownStyle.value = {
       position: 'fixed',
       top: `${rect.bottom + 4}px`,
-      left: `${rect.left}px`,
-      width: `${Math.max(rect.width, 320)}px`,
+      left: `${leftPos}px`,
+      width: `${finalWidth}px`,
       zIndex: '10005',
     }
   }
@@ -452,6 +461,10 @@ onUnmounted(() => {
   border-radius: 4px;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   letter-spacing: 0.02em;
+  max-width: 110px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .clear-btn {

@@ -438,23 +438,23 @@ onUnmounted(() => {
                 </div>
                 <span class="field-error" v-if="createErrors.items">{{ createErrors.items[0] }}</span>
                 
-                <div v-for="(item, idx) in createForm.items" :key="idx" style="display: flex; gap: 10px; margin-bottom: 10px; align-items: flex-start;">
-                  <div style="flex: 1;">
+                <div v-for="(item, idx) in createForm.items" :key="idx" class="return-item-row">
+                  <div class="return-item-product">
                     <ProductCombobox
                       v-model="item.product_id"
                       :products="products"
                       placeholder="Ketik nama produk atau SKU..."
                     />
                   </div>
-                  <div style="width: 150px;">
-                    <div style="display: flex; align-items: center; gap: 8px; background: #fafafd; border: 1px solid #e9e7ef; border-radius: 6px; padding: 0 10px;">
-                      <input type="number" v-model.number="item.quantity" style="width: 100%; border: 0; background: transparent; height: 34px; outline: 0; font-size: 11px;" placeholder="Qty" />
-                      <span style="font-size: 10px; color: #aaa7b5;">
+                  <div class="return-item-qty">
+                    <div class="return-qty-field">
+                      <input type="number" v-model.number="item.quantity" placeholder="Qty" />
+                      <span class="return-unit-badge">
                         {{ products.find(p => p.id === item.product_id)?.unit?.code || 'QTY' }}
                       </span>
                     </div>
                   </div>
-                  <button type="button" style="background: transparent; border: 0; color: #d47770; cursor: pointer; padding: 8px; font-size: 18px;" @click="removeCreateItem(idx)" v-if="createForm.items.length > 1">&times;</button>
+                  <button type="button" class="btn-remove-return-item" @click="removeCreateItem(idx)" v-if="createForm.items.length > 1">&times;</button>
                 </div>
               </div>
             </div>
@@ -604,4 +604,91 @@ onUnmounted(() => {
 .toast-notification.success { background: #292541; }
 .toast-notification.error { background: #d47770; }
 .toast-notification.warning { background: #c48735; }
+
+/* Return Items Row */
+.return-item-row {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 10px;
+  align-items: center;
+}
+.return-item-product {
+  flex: 1;
+  min-width: 0;
+}
+.return-item-qty {
+  width: 140px;
+  flex-shrink: 0;
+}
+.return-qty-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #fafafd;
+  border: 1px solid #e9e7ef;
+  border-radius: 6px;
+  padding: 0 10px;
+  height: 38px;
+  box-sizing: border-box;
+}
+.return-qty-field input {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  outline: 0;
+  font-size: 12px;
+  color: #292541;
+}
+.return-unit-badge {
+  font-size: 10px;
+  font-weight: 600;
+  color: #858291;
+  text-transform: uppercase;
+}
+.btn-remove-return-item {
+  background: transparent;
+  border: 0;
+  color: #d47770;
+  cursor: pointer;
+  padding: 6px;
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+@media (max-width: 640px) {
+  .modal-backdrop {
+    padding: 12px;
+  }
+  .modal-content {
+    max-width: 100% !important;
+    width: 100% !important;
+    border-radius: 14px;
+    max-height: 92vh;
+    overflow-y: auto;
+  }
+  .return-item-row {
+    flex-wrap: wrap;
+    background: #fafafd;
+    border: 1px solid #e9e7ef;
+    border-radius: 8px;
+    padding: 10px;
+    gap: 8px;
+  }
+  .return-item-product {
+    width: 100%;
+    flex: 1 1 100%;
+  }
+  .return-item-qty {
+    flex: 1;
+    width: auto;
+  }
+  .modal-footer {
+    flex-direction: column-reverse;
+    gap: 8px;
+  }
+  .modal-footer button {
+    width: 100%;
+    justify-content: center;
+  }
+}
 </style>
