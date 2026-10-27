@@ -1,12 +1,17 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import axios from 'axios'
-import { MoreHorizontal, Plus, Search, ChevronDown, AlertTriangle, ScanLine } from 'lucide-vue-next'
+import { MoreHorizontal, Plus, Search, ChevronDown, AlertTriangle, ScanLine, Trash2 } from 'lucide-vue-next'
 import DateRangePicker from '../../components/DateRangePicker.vue'
 import ProductCombobox from '../../components/forms/ProductCombobox.vue'
 import CameraScannerModal from '../../components/forms/CameraScannerModal.vue'
 import AppPagination from '../../components/ui/AppPagination.vue'
 import AppSortableTh from '../../components/ui/AppSortableTh.vue'
+
+interface ReservationFormItem {
+  product_id: string
+  quantity: number | string
+}
 
 const reservations = ref<any[]>([])
 const warehouses = ref<any[]>([])
@@ -27,17 +32,48 @@ const sortDir = ref<'asc' | 'desc'>('desc')
 const showAddModal = ref(false)
 const saving = ref(false)
 const getTodayDate = () => new Date().toISOString().slice(0, 10)
-const form = ref({
+const form = ref<{
+  warehouse_id: string
+  reservation_date: string
+  remarks: string
+  expires_at: string
+  items: ReservationFormItem[]
+}>({
   warehouse_id: '',
   reservation_date: getTodayDate(),
-  product_id: '',
-  quantity: '',
   remarks: '',
-  expires_at: ''
+  expires_at: '',
+  items: [
+    { product_id: '', quantity: '' }
+  ]
 })
 const formErrors = ref<Record<string, string[]>>({})
 const availableProducts = ref<any[]>([])
 const fetchingProducts = ref(false)
+
+const addItem = () => {
+  form.value.items.push({ product_id: '', quantity: '' })
+}
+
+const removeItem = (idx: number) => {
+  if (form.value.items.length > 1) {
+    form.value.items.splice(idx, 1)
+  } else {
+    form.value.items = [{ product_id: '', quantity: '' }]
+  }
+}
+
+const getItemUnit = (productId: string) => {
+  if (!productId) return ''
+  const p = availableProducts.value.find(prod => prod.id === productId)
+  return p?.unit?.code || p?.unit?.symbol || p?.unit?.name || 'unit'
+}
+
+const getItemAvailableQty = (productId: string) => {
+  if (!productId) return null
+  const p = availableProducts.value.find(prod => prod.id === productId)
+  return p?.available_qty ?? null
+}
 
 // Scanner kamera untuk nomor seri pemenuhan reservasi
 const showScanner = ref(false)
@@ -58,11 +94,12 @@ const handleScannerComplete = (serials: string[]) => {
 watch(() => form.value.warehouse_id, async (newVal) => {
   if (!newVal) {
     availableProducts.value = []
-    form.value.product_id = ''
+    form.value.items = [{ product_id: '', quantity: '' }]
     return
   }
   fetchingProducts.value = true
-  form.value.product_id = ''
+  // Reset barang saat gudang diganti agar sesuai stok gudang baru
+  form.value.items = [{ product_id: '', quantity: '' }]
   try {
     const res = await axios.get('/stock', { params: { warehouse_id: newVal, per_page: 500 } })
     const productMap = new Map()
@@ -82,12 +119,6 @@ watch(() => form.value.warehouse_id, async (newVal) => {
   } finally {
     fetchingProducts.value = false
   }
-})
-
-const selectedProductUnit = computed(() => {
-  if (!form.value.product_id) return ''
-  const p = availableProducts.value.find(prod => prod.id === form.value.product_id)
-  return p?.unit?.code || p?.unit?.name || ''
 })
 
 const stats = ref({
@@ -159,10 +190,11 @@ const openAddModal = () => {
   form.value = {
     warehouse_id: '',
     reservation_date: getTodayDate(),
-    product_id: '',
-    quantity: '',
     remarks: '',
-    expires_at: ''
+    expires_at: '',
+    items: [
+      { product_id: '', quantity: '' }
+    ]
   }
   formErrors.value = {}
   showAddModal.value = true
@@ -171,18 +203,30 @@ const openAddModal = () => {
 const submit = async () => {
   saving.value = true
   formErrors.value = {}
+
+  // Validasi minimal 1 baris terisi
+  const validItems = form.value.items.filter(i => i.product_id && Number(i.quantity) > 0)
+  if (validItems.length === 0) {
+    formErrors.value = {
+      items: ['Harap pilih produk dan masukkan kuantitas yang valid (minimal 1 baris).']
+    }
+    saving.value = false
+    return
+  }
+
   try {
     await axios.post('/reservations', {
       warehouse_id: form.value.warehouse_id,
       reservation_date: form.value.reservation_date || undefined,
       expires_at: form.value.expires_at || undefined,
       remarks: form.value.remarks || undefined,
-      items: [{
-        product_id: form.value.product_id,
-        quantity: form.value.quantity
-      }]
+      items: validItems.map(i => ({
+        product_id: i.product_id,
+        quantity: Number(i.quantity)
+      }))
     })
     showAddModal.value = false
+    showToast('Reservasi berhasil dibuat', 'success')
     fetchReservations()
   } catch (e: any) {
     if (e.response?.status === 422) {
@@ -487,7 +531,16 @@ const formatDate = (d: string) => {
               </td>
               <td>{{ item.warehouse?.name || '-' }}</td>
               <td class="reservation-quantity">
-                {{ item.items && item.items.length ? (item.items[0].quantity + ' ' + (item.items[0].product?.unit?.symbol || '')) : '-' }}
+                <template v-if="item.items && item.items.length">
+                  <div v-if="item.items.length === 1">
+                    {{ item.items[0].quantity }} {{ item.items[0].product?.unit?.symbol || item.items[0].product?.unit?.code || '' }}
+                  </div>
+                  <div v-else>
+                    <strong>{{ item.items.reduce((acc: number, curr: any) => acc + Number(curr.quantity), 0) }}</strong>
+                    <span style="font-size: 10px; color: #858291; margin-left: 3px;">total unit</span>
+                  </div>
+                </template>
+                <span v-else>-</span>
               </td>
               <td>User ID: {{ item.created_by ? item.created_by.substring(0, 8) : '-' }}</td>
               <td class="muted-cell">
@@ -538,7 +591,7 @@ const formatDate = (d: string) => {
     <Teleport to="body">
       <Transition name="fade">
         <div v-if="showAddModal" class="modal-backdrop" @click="showAddModal = false">
-          <div class="modal-content" @click.stop>
+          <div class="modal-content" style="max-width: 640px;" @click.stop>
             <div class="modal-header">
               <h2>Buat Reservasi Baru</h2>
               <p>Alokasikan stok untuk keperluan pesanan atau kegiatan operasional.</p>
@@ -576,37 +629,86 @@ const formatDate = (d: string) => {
                 </div>
               </div>
               
-              <div class="form-group">
-                <label>Daftar Barang & Kuantitas <span class="req">*</span></label>
-                <div class="reservation-item-row">
-                  <div class="item-combobox-col">
-                    <ProductCombobox
-                      v-model="form.product_id"
-                      :products="availableProducts"
-                      :disabled="!form.warehouse_id || fetchingProducts"
-                      :error="!!formErrors['items.0.product_id']"
-                      :placeholder="!form.warehouse_id ? 'Pilih gudang terlebih dahulu' : (fetchingProducts ? 'Memuat produk...' : (availableProducts.length === 0 ? 'Tidak ada stok di gudang ini' : 'Ketik nama barang atau SKU...'))"
-                    />
+              <div class="form-group" style="margin-top: 6px;">
+                <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 8px;">
+                  <div>
+                    <label style="margin-bottom: 2px;">Daftar Barang & Kuantitas <span class="req">*</span></label>
+                    <span style="font-size: 11px; color: #858291;">
+                      {{ !form.warehouse_id ? 'Pilih gudang terlebih dahulu untuk memilih produk' : 'Pilih produk dan tentukan jumlah reservasi' }}
+                    </span>
                   </div>
-                  <div class="item-qty-col">
-                    <div class="qty-field-wrap">
-                      <input
-                        v-model.number="form.quantity"
-                        type="number"
-                        min="0"
-                        step="any"
-                        placeholder="Jumlah (cth: 1)"
-                        aria-label="Jumlah kuantitas"
-                        :class="{ 'input-error': formErrors['items.0.quantity'] }"
-                        :style="{ paddingRight: selectedProductUnit ? '56px' : '14px' }"
+                  <button
+                    type="button"
+                    class="btn-add-item"
+                    :disabled="!form.warehouse_id || fetchingProducts"
+                    @click="addItem"
+                  >
+                    <Plus :size="13" /> Tambah Baris
+                  </button>
+                </div>
+
+                <div class="items-table-container">
+                  <div class="items-header-row">
+                    <span class="col-product">BARANG / PRODUK (KETIK NAMA ATAU SKU)</span>
+                    <span class="col-qty">QTY</span>
+                    <span class="col-action"></span>
+                  </div>
+
+                  <div
+                    v-for="(item, idx) in form.items"
+                    :key="idx"
+                    class="item-row"
+                  >
+                    <div class="col-product">
+                      <ProductCombobox
+                        v-model="item.product_id"
+                        :products="availableProducts"
+                        :disabled="!form.warehouse_id || fetchingProducts"
+                        :error="!!formErrors[`items.${idx}.product_id`] || (!!formErrors.items && !item.product_id)"
+                        :placeholder="!form.warehouse_id ? 'Pilih gudang terlebih dahulu' : (fetchingProducts ? 'Memuat produk...' : (availableProducts.length === 0 ? 'Tidak ada stok di gudang ini' : 'Ketik nama barang atau SKU...'))"
                       />
-                      <span v-if="selectedProductUnit" class="qty-unit-pill">
-                        {{ selectedProductUnit }}
-                      </span>
+                      <small
+                        v-if="item.product_id && getItemAvailableQty(item.product_id) !== null"
+                        style="display: block; font-size: 10px; color: #684fc0; margin-top: 3px;"
+                      >
+                        Tersedia di gudang: {{ getItemAvailableQty(item.product_id) }} {{ getItemUnit(item.product_id) }}
+                      </small>
+                    </div>
+
+                    <div class="col-qty">
+                      <div class="qty-input-wrapper" :class="{ 'input-error': formErrors[`items.${idx}.quantity`] }">
+                        <input
+                          v-model.number="item.quantity"
+                          type="number"
+                          step="any"
+                          min="0.01"
+                          placeholder="0"
+                          class="qty-field"
+                          :disabled="!item.product_id"
+                        />
+                        <span v-if="getItemUnit(item.product_id)" class="qty-unit">
+                          {{ getItemUnit(item.product_id) }}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div class="col-action">
+                      <button
+                        type="button"
+                        class="btn-remove-row"
+                        title="Hapus baris"
+                        :disabled="form.items.length <= 1 && !item.product_id && !item.quantity"
+                        @click="removeItem(idx)"
+                      >
+                        <Trash2 :size="13" />
+                      </button>
                     </div>
                   </div>
                 </div>
-                <small v-if="formErrors['items.0.product_id'] || formErrors['items.0.quantity']" class="field-error">Harap lengkapi produk dan kuantitas.</small>
+
+                <small v-if="formErrors.items" class="field-error" style="margin-top: 6px;">
+                  {{ Array.isArray(formErrors.items) ? formErrors.items[0] : formErrors.items }}
+                </small>
               </div>
               
               <div class="modal-footer">
@@ -885,48 +987,145 @@ const formatDate = (d: string) => {
 .toast-notification.success { background: #292541; }
 .toast-notification.error { background: #d47770; }
 
-/* Item Row & Qty Responsiveness */
-.reservation-item-row {
-  display: flex;
-  gap: 12px;
+/* Multi-item Table Styles */
+.btn-add-item {
+  display: inline-flex;
   align-items: center;
-  width: 100%;
+  gap: 4px;
+  background: #f4f3fb;
+  border: 1px solid #e3e0f3;
+  color: #6a5ce8;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 5px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
 }
 
-.item-combobox-col {
+.btn-add-item:hover:not(:disabled) {
+  background: #eceaf9;
+  border-color: #6a5ce8;
+}
+
+.btn-add-item:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.items-table-container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: #fafafd;
+  border: 1px solid #eeedf3;
+  border-radius: 10px;
+  padding: 10px;
+}
+
+.items-header-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 4px 6px;
+  border-bottom: 1px solid #ecebf2;
+  font-size: 9px;
+  font-weight: 700;
+  color: #858291;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.item-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.col-product {
   flex: 1;
   min-width: 0;
 }
 
-.item-qty-col {
-  width: 130px;
+.col-qty {
+  width: 120px;
   flex-shrink: 0;
 }
 
-.qty-field-wrap {
-  position: relative;
-  width: 100%;
+.col-action {
+  width: 28px;
+  flex-shrink: 0;
+  display: flex;
+  justify-content: center;
 }
 
-.qty-field-wrap input {
-  width: 100%;
+.qty-input-wrapper {
+  display: flex;
+  align-items: center;
+  background: #ffffff;
+  border: 1px solid #e9e7ef;
+  border-radius: 8px;
+  padding: 0 8px;
+  height: 38px;
+  transition: all 0.2s;
   box-sizing: border-box;
 }
 
-.qty-unit-pill {
-  position: absolute;
-  right: 10px;
-  top: 50%;
-  transform: translateY(-50%);
+.qty-input-wrapper:focus-within {
+  border-color: #bd3c3c;
+  box-shadow: 0 0 0 3px rgba(189, 60, 60, 0.1);
+}
+
+.qty-input-wrapper.input-error {
+  border-color: #c43838;
+  background: #fffafa;
+}
+
+.qty-field {
+  width: 100%;
+  border: none !important;
+  outline: none !important;
+  background: transparent !important;
+  padding: 0 !important;
+  font-size: 12px !important;
+  color: #292541 !important;
+  font-weight: 600 !important;
+  text-align: right;
+  box-shadow: none !important;
+}
+
+.qty-unit {
   font-size: 10px;
-  font-weight: 700;
-  color: #6d697d;
-  background: #eeedf3;
-  padding: 3px 6px;
-  border-radius: 4px;
-  pointer-events: none;
+  font-weight: 600;
+  color: #858291;
+  margin-left: 6px;
   text-transform: uppercase;
-  letter-spacing: 0.03em;
+  user-select: none;
+}
+
+.btn-remove-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #c4c1cd;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.btn-remove-row:hover:not(:disabled) {
+  background: #fff2f2;
+  border-color: #f7d2d2;
+  color: #d47770;
+}
+
+.btn-remove-row:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
 }
 
 /* Mobile responsive adjustments */
@@ -957,23 +1156,31 @@ const formatDate = (d: string) => {
     gap: 12px;
   }
 
-  .reservation-item-row {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 10px;
+  .items-header-row {
+    display: none;
   }
 
-  .item-combobox-col {
+  .item-row {
+    flex-wrap: wrap;
+    background: #ffffff;
+    border: 1px solid #e9e7ef;
+    border-radius: 8px;
+    padding: 10px;
+    gap: 8px;
+  }
+
+  .col-product {
     width: 100%;
+    flex: 1 1 100%;
   }
 
-  .item-qty-col {
-    width: 100%;
+  .col-qty {
+    flex: 1;
+    width: auto;
   }
 
-  .qty-field-wrap input {
-    height: 40px;
-    font-size: 13px;
+  .col-action {
+    flex-shrink: 0;
   }
 
   .modal-footer {

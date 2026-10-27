@@ -939,11 +939,17 @@ onUnmounted(() => {
 
 /* Quick Reports */
 .quick-reports .panel-header {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: flex-start;
   border-bottom: 1px solid #efedf3;
 }
 
 .panel-icon {
   color: #bd3c3c;
+  flex-shrink: 0;
+  margin-top: 2px;
 }
 
 .quick-report {
@@ -996,8 +1002,16 @@ onUnmounted(() => {
   margin-bottom: 18px;
 }
 
+.table-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  width: 100%;
+}
+
 .reports-table {
-  min-width: 800px;
+  min-width: 760px;
+  width: 100%;
+  border-collapse: collapse;
 }
 
 .reports-table th,
@@ -1014,6 +1028,7 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 12px;
+  min-width: 260px;
 }
 
 .report-file {
@@ -1036,9 +1051,12 @@ onUnmounted(() => {
 }
 
 .report-name span {
-  font-size: 9px;
-  color: #aaa7b4;
+  font-size: 9.5px;
+  color: #858291;
   margin-top: 3px;
+  white-space: normal;
+  max-width: 340px;
+  line-height: 1.4;
 }
 
 .category-pill,
@@ -1082,6 +1100,7 @@ onUnmounted(() => {
   padding: 14px 19px;
   color: #aaa7b4;
   font-size: 10px;
+  gap: 12px;
 }
 
 .reports-footer span:last-child {
@@ -1219,6 +1238,52 @@ onUnmounted(() => {
   }
   .report-summary {
     grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .report-summary {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+  .report-summary > div {
+    padding: 12px 14px;
+  }
+  .report-summary strong {
+    font-size: 18px;
+  }
+  .report-chart .panel-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .report-chart .period-select-wrap {
+    width: 100%;
+  }
+  .report-chart .select-button {
+    width: 100%;
+    justify-content: space-between;
+  }
+  .chart-legend {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+    padding: 12px 14px;
+  }
+  .chart-legend strong {
+    margin-left: 0 !important;
+  }
+  .reports-footer {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 12px 16px;
+  }
+}
+
+@media (max-width: 440px) {
+  .report-summary {
+    grid-template-columns: 1fr;
   }
 }
 </style>

@@ -264,6 +264,7 @@ onUnmounted(() => {
         'is-error': error,
         'is-disabled': disabled
       }"
+      :title="selectedProduct ? `${selectedProduct.name}${selectedProduct.sku ? ` (${selectedProduct.sku})` : ''}` : ''"
       @click="openDropdown"
     >
       <Search :size="14" class="search-icon" />
@@ -283,7 +284,11 @@ onUnmounted(() => {
       />
 
       <div class="combobox-actions" @click.stop>
-        <span v-if="selectedProduct?.sku" class="sku-tag" title="SKU Produk">
+        <span
+          v-if="selectedProduct?.sku && !isOpen"
+          class="sku-tag"
+          :title="`SKU: ${selectedProduct.sku}`"
+        >
           {{ selectedProduct.sku }}
         </span>
 
@@ -378,6 +383,8 @@ onUnmounted(() => {
 .product-combobox-wrap {
   position: relative;
   width: 100%;
+  min-width: 0;
+  container-type: inline-size;
 }
 
 .combobox-control {
@@ -385,6 +392,7 @@ onUnmounted(() => {
   align-items: center;
   gap: 8px;
   width: 100%;
+  min-width: 0;
   background: #fafafd;
   border: 1px solid #e9e7ef;
   border-radius: 8px;
@@ -438,6 +446,9 @@ onUnmounted(() => {
   color: #292541 !important;
   font-weight: 500 !important;
   box-shadow: none !important;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
 }
 
 .combobox-input::placeholder {
@@ -450,6 +461,7 @@ onUnmounted(() => {
   align-items: center;
   gap: 6px;
   flex-shrink: 0;
+  min-width: 0;
 }
 
 .sku-tag {
@@ -461,10 +473,35 @@ onUnmounted(() => {
   border-radius: 4px;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   letter-spacing: 0.02em;
-  max-width: 110px;
+  max-width: 90px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  flex-shrink: 1;
+}
+
+@container (max-width: 320px) {
+  .sku-tag {
+    max-width: 60px;
+  }
+}
+
+@container (max-width: 250px) {
+  .sku-tag {
+    display: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .sku-tag {
+    max-width: 70px;
+  }
+}
+
+@media (max-width: 380px) {
+  .sku-tag {
+    display: none;
+  }
 }
 
 .clear-btn {

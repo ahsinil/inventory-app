@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { Calendar, ChevronDown } from 'lucide-vue-next'
 
 const props = defineProps<{
@@ -16,7 +16,7 @@ const emit = defineEmits<{
 const isOpen = ref(false)
 const popover = ref<HTMLElement | null>(null)
 const button = ref<HTMLElement | null>(null)
-const popoverStyle = ref({ top: '0px', left: '0px' })
+const popoverStyle = ref<{ top: string; left: string; width?: string }>({ top: '0px', left: '0px' })
 
 const localFrom = ref(props.from)
 const localTo = ref(props.to)
@@ -26,22 +26,51 @@ watch(() => props.to, (val) => localTo.value = val)
 
 const activePreset = ref<string>('')
 
+const updatePosition = () => {
+  if (!button.value) return
+  const rect = button.value.getBoundingClientRect()
+  const viewportWidth = window.innerWidth
+  const margin = 10 // safe distance from viewport edge
+
+  // Max width that comfortably fits on screen
+  const targetWidth = Math.min(340, viewportWidth - (margin * 2))
+  const scrollX = window.scrollX || window.pageXOffset || 0
+  const scrollY = window.scrollY || window.pageYOffset || 0
+
+  let left = rect.left
+
+  // If aligning left with button causes right edge overflow, align with button right
+  if (left + targetWidth > viewportWidth - margin) {
+    left = rect.right - targetWidth
+  }
+
+  // Clamping to guarantee it never overflows left or right edge of viewport
+  if (left < margin) {
+    left = margin
+  }
+  if (left + targetWidth > viewportWidth - margin) {
+    left = Math.max(margin, viewportWidth - margin - targetWidth)
+  }
+
+  // Check if opening below overflows viewport bottom
+  const estimatedHeight = 310
+  let top = rect.bottom + 6 + scrollY
+  if (rect.bottom + 6 + estimatedHeight > window.innerHeight && rect.top > estimatedHeight + 10) {
+    top = rect.top - estimatedHeight - 6 + scrollY
+  }
+
+  popoverStyle.value = {
+    top: `${top}px`,
+    left: `${left + scrollX}px`,
+    width: `${targetWidth}px`
+  }
+}
+
 const toggle = () => {
   isOpen.value = !isOpen.value
-  if (isOpen.value && button.value) {
-    const rect = button.value.getBoundingClientRect()
-    const popoverWidth = 360 // matching the CSS width
-    let left = rect.left + window.scrollX
-    
-    // Check if it overflows right edge of viewport
-    if (rect.left + popoverWidth > window.innerWidth - 20) {
-      left = rect.right + window.scrollX - popoverWidth
-    }
-    
-    popoverStyle.value = {
-      top: `${rect.bottom + 8 + window.scrollY}px`,
-      left: `${left}px`
-    }
+  if (isOpen.value) {
+    updatePosition()
+    nextTick(() => updatePosition())
   }
 }
 
@@ -127,8 +156,23 @@ const displayText = computed(() => {
   return 'Filter Tanggal'
 })
 
-onMounted(() => document.addEventListener('click', close))
-onUnmounted(() => document.removeEventListener('click', close))
+const handleWindowChange = () => {
+  if (isOpen.value) {
+    updatePosition()
+  }
+}
+
+onMounted(() => {
+  document.addEventListener('click', close)
+  window.addEventListener('resize', handleWindowChange)
+  window.addEventListener('scroll', handleWindowChange, true)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('click', close)
+  window.removeEventListener('resize', handleWindowChange)
+  window.removeEventListener('scroll', handleWindowChange, true)
+})
 </script>
 
 <template>
@@ -197,6 +241,9 @@ onUnmounted(() => document.removeEventListener('click', close))
   transition: all 0.2s;
   outline: none;
   font-family: inherit;
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: 100%;
 }
 .drp-button.has-val, .drp-button.active {
   color: #bd3c3c;
@@ -207,13 +254,18 @@ onUnmounted(() => document.removeEventListener('click', close))
   background: #fafafd;
 }
 .drp-button .icon-cal {
+  flex-shrink: 0;
 }
 .drp-button .icon-chev {
   margin-left: 2px;
+  flex-shrink: 0;
 }
 .drp-text {
   font-weight: 500;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
 }
 
 .drp-popover {
@@ -222,8 +274,11 @@ onUnmounted(() => document.removeEventListener('click', close))
   border: 1px solid #f0eff3;
   border-radius: 8px;
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08);
-  padding: 16px;
-  width: 360px;
+  padding: 14px 16px;
+  width: 340px;
+  max-width: calc(100vw - 20px);
+  box-sizing: border-box;
+  container-type: inline-size;
   z-index: 99999;
 }
 
@@ -231,11 +286,12 @@ onUnmounted(() => document.removeEventListener('click', close))
   display: flex;
   align-items: flex-end;
   gap: 8px;
-  margin-bottom: 16px;
+  margin-bottom: 14px;
 }
 
 .drp-field {
   flex: 1;
+  min-width: 0;
 }
 .drp-field label {
   display: block;
@@ -248,6 +304,7 @@ onUnmounted(() => document.removeEventListener('click', close))
   position: relative;
   display: flex;
   align-items: center;
+  width: 100%;
 }
 .drp-input-wrap .input-icon {
   position: absolute;
@@ -259,13 +316,15 @@ onUnmounted(() => document.removeEventListener('click', close))
   width: 100%;
   border: 1px solid #e9e7ef;
   border-radius: 6px;
-  padding: 8px 20px 8px 24px;
+  padding: 7px 8px 7px 24px;
   font-size: 11px;
   color: #48445c;
   outline: none;
   background: #fafafd;
   box-sizing: border-box;
   transition: all 0.2s;
+  min-width: 0;
+  font-family: inherit;
 }
 .drp-input-wrap input:focus {
   border-color: #bd3c3c;
@@ -274,10 +333,22 @@ onUnmounted(() => document.removeEventListener('click', close))
 }
 
 .drp-dash {
-  width: 12px;
+  width: 10px;
   height: 1px;
   background: #d0ced8;
-  margin-bottom: 16px;
+  margin-bottom: 15px;
+  flex-shrink: 0;
+}
+
+@container (max-width: 280px) {
+  .drp-inputs {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+  .drp-dash {
+    display: none;
+  }
 }
 
 .drp-presets {

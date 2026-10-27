@@ -414,15 +414,25 @@ onUnmounted(() => document.removeEventListener('click', closeDropdown))
                 </label>
 
                 <div v-for="(item, idx) in createForm.items" :key="idx" class="item-card">
-                  <div class="item-top">
-                    <div style="flex: 1;">
-                      <ProductCombobox
-                        v-model="item.product_id"
-                        :products="products"
-                        placeholder="Ketik nama produk atau SKU..."
-                      />
-                    </div>
-                    <button type="button" class="rm-btn" aria-label="Hapus baris" @click="removeItem(idx)"><X :size="15" /></button>
+                  <div v-if="createForm.items.length > 1" class="item-card-header">
+                    <span class="item-card-num">Barang #{{ idx + 1 }}</span>
+                    <button
+                      type="button"
+                      class="rm-btn"
+                      aria-label="Hapus baris"
+                      title="Hapus baris"
+                      @click="removeItem(idx)"
+                    >
+                      <X :size="13" />
+                      <span>Hapus</span>
+                    </button>
+                  </div>
+                  <div class="item-product">
+                    <ProductCombobox
+                      v-model="item.product_id"
+                      :products="products"
+                      placeholder="Ketik nama produk atau SKU..."
+                    />
                   </div>
                   <div class="item-bottom">
                     <select v-model="item.warehouse_location_id" class="grow">
@@ -555,9 +565,13 @@ onUnmounted(() => document.removeEventListener('click', closeDropdown))
 .link-btn { background: none; border: 0; color: #bd3c3c; font-size: 10px; cursor: pointer; font-weight: 600; }
 
 .item-card { padding: 12px 14px; border: 1px solid #eeedf3; border-radius: 10px; margin-bottom: 10px; background: #fff; display: flex; flex-direction: column; gap: 10px; }
+.item-card-header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 2px; }
+.item-card-num { font-size: 11px; font-weight: 600; color: #858291; text-transform: uppercase; letter-spacing: .04em; }
+.item-product { width: 100%; min-width: 0; }
 .item-top, .item-bottom { display: flex; gap: 10px; align-items: center; }
-.grow { flex: 1; }
-.rm-btn { background: none; border: 0; color: #d47770; cursor: pointer; display: grid; place-items: center; padding: 4px; }
+.grow { flex: 1; min-width: 0; }
+.rm-btn { background: none; border: 0; color: #d47770; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 500; padding: 2px 6px; border-radius: 4px; transition: all .15s; }
+.rm-btn:hover { background: #fff2f2; }
 .qty-box { display: flex; align-items: center; gap: 8px; background: #fafafd; border: 1px solid #e9e7ef; padding: 4px 12px; border-radius: 8px; transition: border-color .2s; }
 .qty-box:hover, .qty-box:focus-within { border-color: #bd3c3c; }
 .qty-box .sys { font-size: 10px; color: #aaa7b4; white-space: nowrap; }
@@ -603,6 +617,17 @@ onUnmounted(() => document.removeEventListener('click', closeDropdown))
     border-radius: 14px;
     max-height: 92vh;
     overflow-y: auto;
+  }
+  .modal-header {
+    padding: 18px 20px 14px;
+  }
+  .modern-form {
+    padding: 16px 20px;
+    gap: 12px;
+  }
+  .item-card {
+    padding: 12px;
+    gap: 8px;
   }
   .form-row {
     grid-template-columns: 1fr;

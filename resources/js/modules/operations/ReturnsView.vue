@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import axios from 'axios'
-import { Plus, Search, Ellipsis, ArrowDownLeft, CheckCircle2, PackageCheck, ScanLine } from 'lucide-vue-next'
+import { Plus, Search, Ellipsis, ArrowDownLeft, CheckCircle2, PackageCheck, ScanLine, X } from 'lucide-vue-next'
 import DateRangePicker from '../../components/DateRangePicker.vue'
 import ProductCombobox from '../../components/forms/ProductCombobox.vue'
 import CameraScannerModal from '../../components/forms/CameraScannerModal.vue'
@@ -389,17 +389,17 @@ onUnmounted(() => {
     <Teleport to="body">
       <Transition name="fade">
         <div v-if="showCreateModal" class="modal-backdrop" @click="showCreateModal = false">
-          <div class="modal-content" style="max-width: 650px;" @click.stop>
+          <div class="modal-content modal-create-return" @click.stop>
             <div class="modal-header">
               <h2>Buat Pengembalian Barang</h2>
               <button class="close-button" @click="showCreateModal = false">&times;</button>
             </div>
-            <div class="modal-body" style="max-height: 70vh; overflow-y: auto;">
+            <div class="modal-body">
               <p v-if="createErrors.general" class="delete-error">{{ createErrors.general[0] }}</p>
               
-              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px;">
+              <div class="return-form-grid">
                 <div class="form-group">
-                  <label>Gudang Tujuan</label>
+                  <label>Gudang Tujuan <span class="req">*</span></label>
                   <select v-model="createForm.warehouse_id" class="form-input">
                     <option value="" disabled>Pilih gudang...</option>
                     <option v-for="w in warehouses" :key="w.id" :value="w.id">{{ w.name }}</option>
@@ -407,7 +407,7 @@ onUnmounted(() => {
                   <span class="field-error" v-if="createErrors.warehouse_id">{{ createErrors.warehouse_id[0] }}</span>
                 </div>
                 <div class="form-group">
-                  <label>Alasan Pengembalian</label>
+                  <label>Alasan Pengembalian <span class="req">*</span></label>
                   <input v-model="createForm.reason" class="form-input" placeholder="Misal: Salah kirim, cacat pabrik..." />
                   <span class="field-error" v-if="createErrors.reason">{{ createErrors.reason[0] }}</span>
                 </div>
@@ -415,46 +415,56 @@ onUnmounted(() => {
                   <label>Dikembalikan Oleh</label>
                   <input v-model="createForm.returned_by" class="form-input" placeholder="Nama pelanggan/pihak ketiga" />
                 </div>
-                <div class="form-group" style="display: flex; gap: 10px;">
-                  <div style="flex: 1;">
-                    <label>Tipe Referensi</label>
-                    <select v-model="createForm.reference_type" class="form-input">
-                      <option value="">Tidak ada</option>
-                      <option value="ORDER">Pesanan (Order)</option>
-                      <option value="INVOICE">Faktur (Invoice)</option>
-                    </select>
-                  </div>
-                  <div style="flex: 1;">
-                    <label>ID Referensi</label>
-                    <input v-model="createForm.reference_id" class="form-input" placeholder="Nomor Ref..." :disabled="!createForm.reference_type" />
+                <div class="form-group">
+                  <div class="reference-fields-row">
+                    <div class="ref-type-field">
+                      <label>Tipe Referensi</label>
+                      <select v-model="createForm.reference_type" class="form-input">
+                        <option value="">Tidak ada</option>
+                        <option value="ORDER">Pesanan (Order)</option>
+                        <option value="INVOICE">Faktur (Invoice)</option>
+                      </select>
+                    </div>
+                    <div class="ref-id-field">
+                      <label>ID Referensi</label>
+                      <input v-model="createForm.reference_id" class="form-input" placeholder="Nomor Ref..." :disabled="!createForm.reference_type" />
+                    </div>
                   </div>
                 </div>
               </div>
 
-              <div style="margin-bottom: 16px;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-                  <h3 style="font-size: 12px; font-weight: 600; color: #292541;">Daftar Barang</h3>
-                  <button type="button" class="secondary-button" style="padding: 4px 10px; font-size: 11px;" @click="addCreateItem">+ Tambah Baris</button>
+              <div class="return-items-section">
+                <div class="return-items-header">
+                  <h3>Daftar Barang <span class="req">*</span></h3>
+                  <button type="button" class="add-item-btn" @click="addCreateItem">+ Tambah Baris</button>
                 </div>
                 <span class="field-error" v-if="createErrors.items">{{ createErrors.items[0] }}</span>
                 
-                <div v-for="(item, idx) in createForm.items" :key="idx" class="return-item-row">
-                  <div class="return-item-product">
-                    <ProductCombobox
-                      v-model="item.product_id"
-                      :products="products"
-                      placeholder="Ketik nama produk atau SKU..."
-                    />
+                <div v-for="(item, idx) in createForm.items" :key="idx" class="return-item-card">
+                  <div v-if="createForm.items.length > 1" class="return-item-card-header">
+                    <span class="return-item-num">Barang #{{ idx + 1 }}</span>
+                    <button type="button" class="btn-remove-item" @click="removeCreateItem(idx)" title="Hapus baris">
+                      <X :size="13" />
+                      <span>Hapus</span>
+                    </button>
                   </div>
-                  <div class="return-item-qty">
-                    <div class="return-qty-field">
-                      <input type="number" v-model.number="item.quantity" placeholder="Qty" />
-                      <span class="return-unit-badge">
-                        {{ products.find(p => p.id === item.product_id)?.unit?.code || 'QTY' }}
-                      </span>
+                  <div class="return-item-card-body">
+                    <div class="return-item-product">
+                      <ProductCombobox
+                        v-model="item.product_id"
+                        :products="products"
+                        placeholder="Ketik nama produk atau SKU..."
+                      />
+                    </div>
+                    <div class="return-item-qty">
+                      <div class="return-qty-field">
+                        <input type="number" v-model.number="item.quantity" min="1" placeholder="Qty" />
+                        <span class="return-unit-badge">
+                          {{ products.find(p => p.id === item.product_id)?.unit?.code || 'QTY' }}
+                        </span>
+                      </div>
                     </div>
                   </div>
-                  <button type="button" class="btn-remove-return-item" @click="removeCreateItem(idx)" v-if="createForm.items.length > 1">&times;</button>
                 </div>
               </div>
             </div>
@@ -471,36 +481,36 @@ onUnmounted(() => {
     <Teleport to="body">
       <Transition name="fade">
         <div v-if="showPostModal && activeReturn" class="modal-backdrop" @click="showPostModal = false">
-          <div class="modal-content" style="max-width: 600px;" @click.stop>
+          <div class="modal-content modal-inspect-return" @click.stop>
             <div class="modal-header">
               <h2>Inspeksi & Proses Pengembalian</h2>
               <button class="close-button" @click="showPostModal = false">&times;</button>
             </div>
-            <div class="modal-body" style="max-height: 70vh; overflow-y: auto;">
-              <p style="font-size: 12px; color: #777486; margin-bottom: 16px; line-height: 1.5;">
+            <div class="modal-body">
+              <p class="inspection-desc">
                 Pastikan Anda memeriksa kondisi fisik barang sebelum memasukkannya kembali ke inventaris. Barang dengan status <strong>DAMAGED</strong> atau <strong>DISPOSED</strong> akan diproses sesuai kondisinya.
               </p>
               <p v-if="postErrors" class="delete-error" style="margin-bottom: 16px;">{{ postErrors }}</p>
               
-              <div v-for="(item, idx) in postForm.items" :key="idx" style="margin-bottom: 16px; padding: 12px; border: 1px solid #e9e7ef; border-radius: 6px; background: #fafafd;">
-                <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
-                  <strong style="font-size: 12px; color: #292541;">
+              <div v-for="(item, idx) in postForm.items" :key="idx" class="inspection-card">
+                <div class="inspection-header">
+                  <strong class="inspection-name">
                     {{ products.find(p => p.id === item.product_id)?.name || 'Produk' }}
                   </strong>
-                  <span style="font-size: 11px; color: #777486;">Qty: {{ activeReturn.items.find(i => i.product_id === item.product_id)?.quantity || 0 }}</span>
+                  <span class="inspection-qty">Qty: {{ activeReturn.items.find(i => i.product_id === item.product_id)?.quantity || 0 }}</span>
                 </div>
-                <div style="display: flex; gap: 12px; align-items: flex-start;">
-                  <div style="flex: 1;">
-                    <label style="font-size: 10px; color: #aaa7b5; display: block; margin-bottom: 4px;">Kondisi Barang</label>
+                <div class="inspection-fields">
+                  <div class="inspection-field">
+                    <label>Kondisi Barang</label>
                     <select v-model="item.condition" class="form-input">
                       <option value="GOOD">Bagus (Bisa dijual kembali)</option>
                       <option value="DAMAGED">Rusak (Perlu perbaikan)</option>
                       <option value="DISPOSED">Dibuang (Tidak bisa dipakai)</option>
                     </select>
                   </div>
-                  <div style="flex: 1;" v-if="item.has_sn">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
-                      <label style="font-size: 10px; color: #aaa7b5; margin: 0;">Serial Numbers (Pisahkan dgn koma)</label>
+                  <div class="inspection-field" v-if="item.has_sn">
+                    <div class="sn-label-row">
+                      <label>Serial Numbers (Pisahkan dgn koma)</label>
                       <button
                         type="button"
                         class="sn-scan-btn-small"
@@ -518,7 +528,7 @@ onUnmounted(() => {
             </div>
             <div class="modal-footer">
               <button type="button" class="cancel-button" @click="showPostModal = false">Batal</button>
-              <button type="button" class="primary-button" style="background: #3b9d76; border-color: #3b9d76;" :disabled="posting" @click="submitPost">
+              <button type="button" class="primary-button btn-complete-return" :disabled="posting" @click="submitPost">
                 {{ posting ? 'Memproses...' : 'Selesaikan Pengembalian' }}
               </button>
             </div>
@@ -579,37 +589,227 @@ onUnmounted(() => {
 .dd-item:hover { background: #f4f3ff; color: #6a5ce8; }
 .dd-item.ok:hover { background: #eaf8f1; color: #3b9d76; }
 
-.modal-backdrop { position: fixed; inset: 0; background: rgba(15, 14, 27, 0.4); backdrop-filter: blur(2px); display: grid; place-items: center; z-index: 100; padding: 20px; }
-.modal-content { background: #fff; border-radius: 12px; width: 100%; box-shadow: 0 10px 30px rgba(0,0,0,0.1); display: flex; flex-direction: column; overflow: hidden; }
-.modal-header { padding: 18px 24px; border-bottom: 1px solid #f0eff3; display: flex; justify-content: space-between; align-items: center; }
-.modal-header h2 { margin: 0; font-size: 16px; font-weight: 600; color: #292541; }
-.close-button { background: transparent; border: 0; font-size: 20px; color: #aaa7b5; cursor: pointer; padding: 0; }
-.modal-body { padding: 24px; }
-.modal-footer { padding: 16px 24px; border-top: 1px solid #f0eff3; background: #fafafd; display: flex; justify-content: flex-end; gap: 10px; }
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 14, 27, 0.45);
+  backdrop-filter: blur(2px);
+  display: grid;
+  place-items: center;
+  z-index: 100;
+  padding: 20px;
+}
+.modal-content {
+  background: #fff;
+  border-radius: 12px;
+  width: 100%;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  max-height: 90vh;
+  box-sizing: border-box;
+}
+.modal-create-return {
+  max-width: 650px;
+}
+.modal-inspect-return {
+  max-width: 600px;
+}
+.modal-header {
+  padding: 18px 24px;
+  border-bottom: 1px solid #f0eff3;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-shrink: 0;
+}
+.modal-header h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #292541;
+}
+.close-button {
+  background: transparent;
+  border: 0;
+  font-size: 20px;
+  color: #aaa7b5;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+}
+.close-button:hover {
+  color: #292541;
+}
+.modal-body {
+  padding: 24px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  flex: 1 1 auto;
+}
+.modal-footer {
+  padding: 16px 24px;
+  border-top: 1px solid #f0eff3;
+  background: #fafafd;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-shrink: 0;
+}
 
-.form-group { margin-bottom: 16px; }
-.form-group label { display: block; font-size: 11px; font-weight: 600; color: #48445c; margin-bottom: 6px; }
-.form-input { width: 100%; border: 1px solid #e9e7ef; border-radius: 6px; padding: 8px 12px; font-size: 12px; color: #292541; background: #fff; transition: border-color 0.2s; height: 36px; }
-.form-input:focus { outline: none; border-color: #6a5ce8; box-shadow: 0 0 0 3px rgba(106, 92, 232, 0.1); }
-.field-error { color: #d47770; font-size: 10px; margin-top: 4px; display: block; }
-.delete-error { background: #fdf5f4; color: #d47770; padding: 10px 14px; border-radius: 6px; font-size: 12px; border: 1px solid #fadcd9; }
+.req {
+  color: #d47770;
+  margin-left: 2px;
+}
+.form-group {
+  margin-bottom: 16px;
+}
+.form-group label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  color: #48445c;
+  margin-bottom: 6px;
+}
+.form-input {
+  width: 100%;
+  border: 1px solid #e9e7ef;
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 12px;
+  color: #292541;
+  background: #fff;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  height: 38px;
+  box-sizing: border-box;
+  font-family: inherit;
+}
+.form-input:focus {
+  outline: none;
+  border-color: #bd3c3c;
+  box-shadow: 0 0 0 3px rgba(189, 60, 60, 0.08);
+}
+.field-error {
+  color: #d47770;
+  font-size: 10px;
+  margin-top: 4px;
+  display: block;
+}
+.delete-error {
+  background: #fdf5f4;
+  color: #d47770;
+  padding: 10px 14px;
+  border-radius: 6px;
+  font-size: 12px;
+  border: 1px solid #fadcd9;
+  margin-bottom: 16px;
+}
 
-.pagination-button:disabled { opacity: 0.5; cursor: not-allowed; }
-
-.fade-enter-active, .fade-leave-active { transition: opacity 0.2s ease; }
-.fade-enter-from, .fade-leave-to { opacity: 0; }
-
-/* Toast */
-.toast-notification { position: fixed; bottom: 24px; right: 24px; padding: 12px 20px; border-radius: 8px; font-size: 12px; font-weight: 500; z-index: 10001; box-shadow: 0 10px 30px rgba(0,0,0,0.1); color: #fff; max-width: 300px; display: flex; align-items: center; gap: 10px; }
-.toast-notification.success { background: #292541; }
-.toast-notification.error { background: #d47770; }
-.toast-notification.warning { background: #c48735; }
-
-/* Return Items Row */
-.return-item-row {
+/* Return Form Grid */
+.return-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px 16px;
+  margin-bottom: 20px;
+}
+.reference-fields-row {
   display: flex;
   gap: 10px;
+}
+.ref-type-field,
+.ref-id-field {
+  flex: 1;
+  min-width: 0;
+}
+.ref-type-field label,
+.ref-id-field label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  color: #48445c;
+  margin-bottom: 6px;
+}
+
+/* Return Items Section */
+.return-items-section {
+  margin-bottom: 16px;
+}
+.return-items-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+.return-items-header h3 {
+  font-size: 12px;
+  font-weight: 600;
+  color: #292541;
+  margin: 0;
+}
+.add-item-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid #e9e7ef;
+  background: #fff;
+  color: #48445c;
+  border-radius: 6px;
+  padding: 5px 10px;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.add-item-btn:hover {
+  background: #fafafd;
+  border-color: #dedbe8;
+}
+
+.return-item-card {
+  background: #fafafd;
+  border: 1px solid #eeedf3;
+  border-radius: 8px;
+  padding: 12px;
   margin-bottom: 10px;
+  transition: all 0.2s;
+}
+.return-item-card:hover {
+  border-color: #dedbe8;
+}
+.return-item-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 8px;
+  margin-bottom: 10px;
+  border-bottom: 1px dashed #e9e7ef;
+}
+.return-item-num {
+  font-size: 11px;
+  font-weight: 600;
+  color: #777486;
+}
+.btn-remove-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: transparent;
+  border: 0;
+  color: #d47770;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 3px 6px;
+  border-radius: 4px;
+  transition: all 0.15s;
+}
+.btn-remove-item:hover {
+  background: #fff0f0;
+}
+.return-item-card-body {
+  display: flex;
+  gap: 10px;
   align-items: center;
 }
 .return-item-product {
@@ -624,7 +824,7 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 8px;
-  background: #fafafd;
+  background: #fff;
   border: 1px solid #e9e7ef;
   border-radius: 6px;
   padding: 0 10px;
@@ -638,57 +838,250 @@ onUnmounted(() => {
   outline: 0;
   font-size: 12px;
   color: #292541;
+  flex: 1;
+  min-width: 0;
 }
 .return-unit-badge {
   font-size: 10px;
   font-weight: 600;
   color: #858291;
   text-transform: uppercase;
-}
-.btn-remove-return-item {
-  background: transparent;
-  border: 0;
-  color: #d47770;
-  cursor: pointer;
-  padding: 6px;
-  font-size: 18px;
   flex-shrink: 0;
+}
+
+/* Inspection Cards */
+.inspection-desc {
+  font-size: 12px;
+  color: #777486;
+  margin: 0 0 16px;
+  line-height: 1.5;
+}
+.inspection-card {
+  margin-bottom: 14px;
+  padding: 12px;
+  border: 1px solid #e9e7ef;
+  border-radius: 8px;
+  background: #fafafd;
+}
+.inspection-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+.inspection-name {
+  font-size: 12px;
+  color: #292541;
+  font-weight: 600;
+}
+.inspection-qty {
+  font-size: 11px;
+  color: #777486;
+  font-weight: 500;
+}
+.inspection-fields {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+.inspection-field {
+  flex: 1;
+  min-width: 0;
+}
+.inspection-field label {
+  font-size: 10px;
+  color: #858291;
+  display: block;
+  margin-bottom: 4px;
+  font-weight: 600;
+}
+.sn-label-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+  gap: 6px;
+}
+.sn-label-row label {
+  margin: 0;
+}
+
+/* Buttons */
+.cancel-button {
+  background: #fff;
+  border: 1px solid #e9e7ef;
+  color: #777486;
+  padding: 9px 16px;
+  border-radius: 7px;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+}
+.cancel-button:hover {
+  background: #fafafd;
+  color: #48445c;
+  border-color: #dedbe8;
+}
+.primary-button {
+  background: #bd3c3c;
+  border: 1px solid #bd3c3c;
+  color: #fff;
+  padding: 9px 16px;
+  border-radius: 7px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+}
+.primary-button:hover:not(:disabled) {
+  background: #a83232;
+  border-color: #a83232;
+}
+.primary-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.btn-complete-return {
+  background: #3b9d76 !important;
+  border-color: #3b9d76 !important;
+}
+.btn-complete-return:hover:not(:disabled) {
+  background: #328a67 !important;
+  border-color: #328a67 !important;
+}
+
+.pagination-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+
+/* Toast */
+.toast-notification {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  padding: 12px 20px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 500;
+  z-index: 10001;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+  color: #fff;
+  max-width: 300px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.toast-notification.success {
+  background: #292541;
+}
+.toast-notification.error {
+  background: #d47770;
+}
+.toast-notification.warning {
+  background: #c48735;
 }
 
 @media (max-width: 640px) {
   .modal-backdrop {
-    padding: 12px;
+    padding: 10px;
   }
   .modal-content {
     max-width: 100% !important;
     width: 100% !important;
     border-radius: 14px;
-    max-height: 92vh;
+    max-height: 94vh;
+    max-height: 94dvh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .modal-header {
+    padding: 14px 16px;
+    flex-shrink: 0;
+  }
+  .modal-header h2 {
+    font-size: 15px;
+  }
+  .modal-body {
+    padding: 14px 16px;
+    flex: 1 1 auto;
+    min-height: 0;
     overflow-y: auto;
-  }
-  .return-item-row {
-    flex-wrap: wrap;
-    background: #fafafd;
-    border: 1px solid #e9e7ef;
-    border-radius: 8px;
-    padding: 10px;
-    gap: 8px;
-  }
-  .return-item-product {
-    width: 100%;
-    flex: 1 1 100%;
-  }
-  .return-item-qty {
-    flex: 1;
-    width: auto;
+    -webkit-overflow-scrolling: touch;
   }
   .modal-footer {
+    padding: 12px 16px;
+    flex-shrink: 0;
     flex-direction: column-reverse;
     gap: 8px;
   }
   .modal-footer button {
     width: 100%;
+    height: 40px;
+    font-size: 12px;
     justify-content: center;
+  }
+  .return-form-grid {
+    grid-template-columns: 1fr;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+  .form-group {
+    margin-bottom: 0;
+  }
+  .reference-fields-row {
+    display: flex;
+    gap: 8px;
+  }
+  .return-item-card {
+    padding: 10px;
+  }
+  .return-item-card-body {
+    flex-direction: column;
+    gap: 8px;
+  }
+  .return-item-product {
+    width: 100%;
+  }
+  .return-item-qty {
+    width: 100%;
+  }
+  .inspection-fields {
+    flex-direction: column;
+    gap: 10px;
+  }
+  .inspection-field {
+    width: 100%;
+  }
+}
+
+@media (max-width: 380px) {
+  .reference-fields-row {
+    flex-direction: column;
+    gap: 10px;
   }
 }
 </style>

@@ -103,28 +103,6 @@ const isMuted = ref(false)
 const scannedItems = ref<string[]>([])
 const manualInput = ref('')
 
-// Initialize scanned items when modal opens
-watch(
-  () => props.modelValue,
-  async (isOpen) => {
-    if (isOpen) {
-      scannedItems.value = [...(props.initialValues || [])]
-      detectedCandidates.value = []
-      scannerError.value = ''
-      lastScannedText.value = ''
-      duplicateNotice.value = ''
-      ignoredMacNotice.value = ''
-      pendingSingleScan.value = null
-      clearAutoConfirmTimer()
-      await nextTick()
-      startScanner()
-    } else {
-      stopScanner()
-    }
-  },
-  { immediate: true }
-)
-
 // Supported 1D & 2D barcode formats for hardware serial numbers
 const supportedFormats = [
   Html5QrcodeSupportedFormats.CODE_128,
@@ -614,6 +592,28 @@ const handleClose = () => {
   emit('close')
 }
 
+// Watch modal state (placed after startScanner and stopScanner are defined to prevent TDZ ReferenceError)
+watch(
+  () => props.modelValue,
+  async (isOpen) => {
+    if (isOpen) {
+      scannedItems.value = [...(props.initialValues || [])]
+      detectedCandidates.value = []
+      scannerError.value = ''
+      lastScannedText.value = ''
+      duplicateNotice.value = ''
+      ignoredMacNotice.value = ''
+      pendingSingleScan.value = null
+      clearAutoConfirmTimer()
+      await nextTick()
+      startScanner()
+    } else {
+      stopScanner()
+    }
+  },
+  { immediate: true }
+)
+
 onBeforeUnmount(() => {
   stopScanner()
 })
@@ -658,27 +658,7 @@ const isTargetReached = computed(() => {
             </div>
           </div>
 
-          <!-- Settings Tray (Collapsible) -->
-          <div v-if="showAdvancedSettings" class="stacked-barcode-settings">
-            <div class="settings-grid">
-              <label class="setting-item">
-                <input v-model="ignoreMacAddress" type="checkbox" />
-                <span><strong>Abaikan Barcode MAC Address</strong> (Prioritaskan GPON SN / Serial Number)</span>
-              </label>
-
-              <label class="setting-item">
-                <input v-model="autoCleanPrefix" type="checkbox" />
-                <span><strong>Bersihkan Prefix</strong> (Potong awalan "GPON SN:", "S/N:", dll)</span>
-              </label>
-
-              <label class="setting-item">
-                <input v-model="isFocusedMode" type="checkbox" @change="toggleFramingMode" />
-                <span><strong>Area Fokus Sedang (140px)</strong> (Batas kotak lebih terfokus tanpa memotong garis)</span>
-              </label>
-            </div>
-          </div>
-
-          <!-- Multi-scan Target Counter Bar -->
+          <!-- Multi-scan Target Counter Bar (Pinned under header) -->
           <div v-if="mode === 'multi'" class="scanner-counter-bar">
             <div class="counter-text">
               <span class="counter-label">Nomor Seri Terpindai:</span>
@@ -700,212 +680,235 @@ const isTargetReached = computed(() => {
             </div>
           </div>
 
-          <!-- Scanner Viewport -->
-          <div class="scanner-viewport-wrapper">
-            <div :id="regionId" class="scanner-camera-region"></div>
+          <!-- Scrollable Modal Body -->
+          <div class="scanner-modal-body">
+            <!-- Settings Tray (Collapsible) -->
+            <div v-if="showAdvancedSettings" class="stacked-barcode-settings">
+              <div class="settings-grid">
+                <label class="setting-item">
+                  <input v-model="ignoreMacAddress" type="checkbox" />
+                  <span><strong>Abaikan Barcode MAC Address</strong> (Prioritaskan GPON SN / Serial Number)</span>
+                </label>
 
-            <!-- Custom Reticle & Overlay UI -->
-            <div class="scanner-viewfinder-overlay" :class="{ 'flash-success': showSuccessFlash }">
-              <!-- Reticle Guides -->
-              <div
-                class="reticle-box"
-                :class="{ 'focused-frame': isFocusedMode }"
-              >
-                <div class="corner top-left"></div>
-                <div class="corner top-right"></div>
-                <div class="corner bottom-left"></div>
-                <div class="corner bottom-right"></div>
-                <div class="laser-scanner-line"></div>
-              </div>
+                <label class="setting-item">
+                  <input v-model="autoCleanPrefix" type="checkbox" />
+                  <span><strong>Bersihkan Prefix</strong> (Potong awalan "GPON SN:", "S/N:", dll)</span>
+                </label>
 
-              <!-- Top controls overlay: Area Mode, Zoom, Torch, Flip, Mute -->
-              <div class="scanner-top-controls">
-                <!-- Framing Mode Toggle Button -->
-                <button
-                  type="button"
-                  class="control-pill-btn"
-                  :class="{ active: isFocusedMode }"
-                  @click="toggleFramingMode"
-                  :title="isFocusedMode ? 'Kembali ke Area Luas (Rekomendasi)' : 'Gunakan Area Fokus Sedang'"
-                >
-                  <Target :size="14" />
-                  <span>{{ isFocusedMode ? 'Area Fokus' : 'Area Luas' }}</span>
-                </button>
-
-                <!-- Zoom Button (1x / 2x / 3x) -->
-                <button
-                  v-if="hasZoom"
-                  type="button"
-                  class="control-pill-btn"
-                  :class="{ active: currentZoom > 1 }"
-                  @click="cycleZoom"
-                  :title="'Zoom: ' + currentZoom + 'x'"
-                >
-                  <ZoomIn :size="14" />
-                  <span>{{ currentZoom }}x</span>
-                </button>
-
-                <!-- Senter / Torch -->
-                <button
-                  v-if="hasTorch"
-                  type="button"
-                  class="control-pill-btn"
-                  :class="{ active: isTorchOn }"
-                  @click="toggleTorch"
-                  :title="isTorchOn ? 'Matikan Senter' : 'Nyalakan Senter'"
-                >
-                  <Zap :size="14" />
-                </button>
-
-                <!-- Switch Camera -->
-                <button
-                  v-if="cameraList.length > 1"
-                  type="button"
-                  class="control-pill-btn"
-                  @click="switchCamera"
-                  title="Ganti Kamera"
-                >
-                  <RefreshCw :size="14" />
-                </button>
-
-                <!-- Sound Toggle -->
-                <button
-                  type="button"
-                  class="control-pill-btn"
-                  :class="{ muted: isMuted }"
-                  @click="isMuted = !isMuted"
-                  :title="isMuted ? 'Bunyikan Suara' : 'Bisukan Suara'"
-                >
-                  <Volume2 v-if="!isMuted" :size="14" />
-                  <VolumeX v-else :size="14" />
-                </button>
-              </div>
-
-              <!-- Live Detected Barcodes Banner / Indicator -->
-              <div v-if="lastScannedText && !pendingSingleScan" class="scanned-pill-preview">
-                <CheckCircle2 :size="14" class="success-icon" />
-                <span>Terdeteksi: <strong>{{ autoCleanPrefix ? cleanPrefix(lastScannedText) : lastScannedText }}</strong></span>
+                <label class="setting-item">
+                  <input v-model="isFocusedMode" type="checkbox" @change="toggleFramingMode" />
+                  <span><strong>Area Fokus Sedang (140px)</strong> (Batas kotak lebih terfokus tanpa memotong garis)</span>
+                </label>
               </div>
             </div>
 
-            <!-- Single Mode Confirmation Drawer -->
-            <div v-if="pendingSingleScan" class="single-scan-confirm-overlay">
-              <div class="confirm-content">
-                <div class="confirm-header">
-                  <CheckCircle2 :size="16" class="success-icon" />
-                  <span>{{ pendingSingleScan.label }} Terdeteksi:</span>
+            <!-- Scanner Viewport -->
+            <div class="scanner-viewport-wrapper">
+              <div :id="regionId" class="scanner-camera-region"></div>
+
+              <!-- Custom Reticle & Overlay UI -->
+              <div class="scanner-viewfinder-overlay" :class="{ 'flash-success': showSuccessFlash }">
+                <!-- Reticle Guides -->
+                <div
+                  class="reticle-box"
+                  :class="{ 'focused-frame': isFocusedMode }"
+                >
+                  <div class="corner top-left"></div>
+                  <div class="corner top-right"></div>
+                  <div class="corner bottom-left"></div>
+                  <div class="corner bottom-right"></div>
+                  <div class="laser-scanner-line"></div>
                 </div>
-                <div class="confirm-value-row">
-                  <strong class="confirm-clean-val">{{ pendingSingleScan.cleaned }}</strong>
-                  <span v-if="pendingSingleScan.raw !== pendingSingleScan.cleaned" class="confirm-raw-val">
-                    (dari "{{ pendingSingleScan.raw }}")
+
+                <!-- Top controls overlay: Area Mode, Zoom, Torch, Flip, Mute -->
+                <div class="scanner-top-controls">
+                  <!-- Framing Mode Toggle Button -->
+                  <button
+                    type="button"
+                    class="control-pill-btn"
+                    :class="{ active: isFocusedMode }"
+                    @click="toggleFramingMode"
+                    :title="isFocusedMode ? 'Kembali ke Area Luas (Rekomendasi)' : 'Gunakan Area Fokus Sedang'"
+                  >
+                    <Target :size="14" />
+                    <span>{{ isFocusedMode ? 'Area Fokus' : 'Area Luas' }}</span>
+                  </button>
+
+                  <!-- Zoom Button (1x / 2x / 3x) -->
+                  <button
+                    v-if="hasZoom"
+                    type="button"
+                    class="control-pill-btn"
+                    :class="{ active: currentZoom > 1 }"
+                    @click="cycleZoom"
+                    :title="'Zoom: ' + currentZoom + 'x'"
+                  >
+                    <ZoomIn :size="14" />
+                    <span>{{ currentZoom }}x</span>
+                  </button>
+
+                  <!-- Senter / Torch -->
+                  <button
+                    v-if="hasTorch"
+                    type="button"
+                    class="control-pill-btn"
+                    :class="{ active: isTorchOn }"
+                    @click="toggleTorch"
+                    :title="isTorchOn ? 'Matikan Senter' : 'Nyalakan Senter'"
+                  >
+                    <Zap :size="14" />
+                  </button>
+
+                  <!-- Switch Camera -->
+                  <button
+                    v-if="cameraList.length > 1"
+                    type="button"
+                    class="control-pill-btn"
+                    @click="switchCamera"
+                    title="Ganti Kamera"
+                  >
+                    <RefreshCw :size="14" />
+                  </button>
+
+                  <!-- Sound Toggle -->
+                  <button
+                    type="button"
+                    class="control-pill-btn"
+                    :class="{ muted: isMuted }"
+                    @click="isMuted = !isMuted"
+                    :title="isMuted ? 'Bunyikan Suara' : 'Bisukan Suara'"
+                  >
+                    <Volume2 v-if="!isMuted" :size="14" />
+                    <VolumeX v-else :size="14" />
+                  </button>
+                </div>
+
+                <!-- Live Detected Barcodes Banner / Indicator -->
+                <div v-if="lastScannedText && !pendingSingleScan" class="scanned-pill-preview">
+                  <CheckCircle2 :size="14" class="success-icon" />
+                  <span>Terdeteksi: <strong>{{ autoCleanPrefix ? cleanPrefix(lastScannedText) : lastScannedText }}</strong></span>
+                </div>
+              </div>
+
+              <!-- Single Mode Confirmation Drawer -->
+              <div v-if="pendingSingleScan" class="single-scan-confirm-overlay">
+                <div class="confirm-content">
+                  <div class="confirm-header">
+                    <CheckCircle2 :size="16" class="success-icon" />
+                    <span>{{ pendingSingleScan.label }} Terdeteksi:</span>
+                  </div>
+                  <div class="confirm-value-row">
+                    <strong class="confirm-clean-val">{{ pendingSingleScan.cleaned }}</strong>
+                    <span v-if="pendingSingleScan.raw !== pendingSingleScan.cleaned" class="confirm-raw-val">
+                      (dari "{{ pendingSingleScan.raw }}")
+                    </span>
+                  </div>
+                  <!-- Countdown bar for auto-confirm -->
+                  <div class="confirm-timer-track">
+                    <div class="confirm-timer-bar" :style="{ width: autoConfirmCountdown + '%' }"></div>
+                  </div>
+                  <div class="confirm-actions">
+                    <button type="button" class="btn-rescan" @click="cancelPendingScan">
+                      <RotateCcw :size="13" /> Scan Ulang
+                    </button>
+                    <button type="button" class="btn-accept" @click="confirmSingleScan">
+                      <Check :size="14" /> Gunakan Ini
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- MAC Address Ignored Alert -->
+            <div v-if="ignoredMacNotice" class="scanner-alert info">
+              <AlertCircle :size="16" class="alert-icon" />
+              <span>{{ ignoredMacNotice }}</span>
+            </div>
+
+            <!-- Duplicate Warning Notice -->
+            <div v-if="duplicateNotice" class="scanner-alert warning">
+              <AlertCircle :size="16" class="alert-icon" />
+              <span>{{ duplicateNotice }}</span>
+            </div>
+
+            <!-- Error Alert -->
+            <div v-if="scannerError" class="scanner-alert error">
+              <AlertCircle :size="16" class="alert-icon" />
+              <div class="alert-content">
+                <span>{{ scannerError }}</span>
+              </div>
+            </div>
+
+            <!-- SOLUSI BARCODE BERTUMPUK: Daftar Barcode yang Terdeteksi pada Perangkat -->
+            <div v-if="detectedCandidates.length > 0" class="detected-candidates-section">
+              <div class="candidates-title-row">
+                <Sparkles :size="14" class="sparkle-icon" />
+                <span>Barcode Terdeteksi pada Stiker:</span>
+                <small>(Klik untuk langsung menggunakan)</small>
+              </div>
+              <div class="candidates-list">
+                <button
+                  v-for="(cand, cIdx) in detectedCandidates"
+                  :key="cIdx"
+                  type="button"
+                  class="candidate-pill-btn"
+                  :class="{ 'is-preferred-serial': cand.isSerial, 'is-mac': cand.isMac }"
+                  @click="selectCandidate(cand)"
+                  :title="'Gunakan ' + cand.cleaned"
+                >
+                  <div class="candidate-main">
+                    <span class="cand-label">{{ cand.label }}:</span>
+                    <strong class="cand-val">{{ cand.cleaned }}</strong>
+                  </div>
+                  <span class="cand-pick-btn">
+                    <Check :size="12" /> Pilih
                   </span>
-                </div>
-                <!-- Countdown bar for auto-confirm -->
-                <div class="confirm-timer-track">
-                  <div class="confirm-timer-bar" :style="{ width: autoConfirmCountdown + '%' }"></div>
-                </div>
-                <div class="confirm-actions">
-                  <button type="button" class="btn-rescan" @click="cancelPendingScan">
-                    <RotateCcw :size="13" /> Scan Ulang
-                  </button>
-                  <button type="button" class="btn-accept" @click="confirmSingleScan">
-                    <Check :size="14" /> Gunakan Ini
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- MAC Address Ignored Alert -->
-          <div v-if="ignoredMacNotice" class="scanner-alert info">
-            <AlertCircle :size="16" class="alert-icon" />
-            <span>{{ ignoredMacNotice }}</span>
-          </div>
-
-          <!-- Duplicate Warning Notice -->
-          <div v-if="duplicateNotice" class="scanner-alert warning">
-            <AlertCircle :size="16" class="alert-icon" />
-            <span>{{ duplicateNotice }}</span>
-          </div>
-
-          <!-- Error Alert -->
-          <div v-if="scannerError" class="scanner-alert error">
-            <AlertCircle :size="16" class="alert-icon" />
-            <div class="alert-content">
-              <span>{{ scannerError }}</span>
-            </div>
-          </div>
-
-          <!-- SOLUSI BARCODE BERTUMPUK: Daftar Barcode yang Terdeteksi pada Perangkat -->
-          <div v-if="detectedCandidates.length > 0" class="detected-candidates-section">
-            <div class="candidates-title-row">
-              <Sparkles :size="14" class="sparkle-icon" />
-              <span>Barcode Terdeteksi pada Stiker:</span>
-              <small>(Klik untuk langsung menggunakan)</small>
-            </div>
-            <div class="candidates-list">
-              <button
-                v-for="(cand, cIdx) in detectedCandidates"
-                :key="cIdx"
-                type="button"
-                class="candidate-pill-btn"
-                :class="{ 'is-preferred-serial': cand.isSerial, 'is-mac': cand.isMac }"
-                @click="selectCandidate(cand)"
-                :title="'Gunakan ' + cand.cleaned"
-              >
-                <div class="candidate-main">
-                  <span class="cand-label">{{ cand.label }}:</span>
-                  <strong class="cand-val">{{ cand.cleaned }}</strong>
-                </div>
-                <span class="cand-pick-btn">
-                  <Check :size="12" /> Pilih
-                </span>
-              </button>
-            </div>
-          </div>
-
-          <!-- Multi-Mode Scanned List Chips & Manual Input -->
-          <div v-if="mode === 'multi'" class="scanned-items-section">
-            <div class="manual-add-row">
-              <input
-                v-model="manualInput"
-                type="text"
-                placeholder="Atau ketik S/N manual..."
-                class="manual-input"
-                @keydown.enter.prevent="addManualEntry"
-              />
-              <button
-                type="button"
-                class="manual-add-btn"
-                :disabled="!manualInput.trim()"
-                @click="addManualEntry"
-              >
-                <Plus :size="14" /> Tambah
-              </button>
-            </div>
-
-            <!-- Scanned chips container -->
-            <div class="chips-container" v-if="scannedItems.length > 0">
-              <div
-                v-for="(sn, idx) in scannedItems"
-                :key="idx"
-                class="sn-chip"
-              >
-                <span class="sn-chip-index">{{ idx + 1 }}.</span>
-                <span class="sn-chip-text">{{ sn }}</span>
-                <button
-                  type="button"
-                  class="sn-chip-del"
-                  @click="removeScannedItem(idx)"
-                  title="Hapus"
-                >
-                  <X :size="12" />
                 </button>
               </div>
             </div>
-            <div v-else class="chips-empty-notice">
-              Arahkan kamera ke stiker perangkat dalam <strong>Area Luas</strong>. Sistem otomatis mendeteksi dan memfilter <strong>GPON SN</strong>.
+
+            <!-- Multi-Mode Scanned List Chips & Manual Input -->
+            <div v-if="mode === 'multi'" class="scanned-items-section">
+              <div class="manual-add-row">
+                <input
+                  v-model="manualInput"
+                  type="text"
+                  placeholder="Atau ketik S/N manual..."
+                  class="manual-input"
+                  @keydown.enter.prevent="addManualEntry"
+                />
+                <button
+                  type="button"
+                  class="manual-add-btn"
+                  :disabled="!manualInput.trim()"
+                  @click="addManualEntry"
+                >
+                  <Plus :size="14" /> Tambah
+                </button>
+              </div>
+
+              <!-- Scanned chips container -->
+              <div class="chips-container" v-if="scannedItems.length > 0">
+                <div
+                  v-for="(sn, idx) in scannedItems"
+                  :key="idx"
+                  class="sn-chip"
+                >
+                  <span class="sn-chip-index">{{ idx + 1 }}.</span>
+                  <span class="sn-chip-text">{{ sn }}</span>
+                  <button
+                    type="button"
+                    class="sn-chip-del"
+                    @click="removeScannedItem(idx)"
+                    title="Hapus"
+                  >
+                    <X :size="12" />
+                  </button>
+                </div>
+              </div>
+              <div v-else class="chips-empty-notice">
+                Arahkan kamera ke stiker perangkat dalam <strong>Area Luas</strong>. Sistem otomatis mendeteksi dan memfilter <strong>GPON SN</strong>.
+              </div>
             </div>
           </div>
 
@@ -965,6 +968,7 @@ const isTargetReached = computed(() => {
   width: 100%;
   max-width: 520px;
   max-height: 94vh;
+  max-height: 94dvh;
   display: flex;
   flex-direction: column;
   box-shadow: 0 24px 60px rgba(18, 15, 36, 0.28), 0 2px 8px rgba(0, 0, 0, 0.08);
@@ -990,6 +994,7 @@ const isTargetReached = computed(() => {
   align-items: center;
   padding: 16px 22px;
   border-bottom: 1px solid #f0eff3;
+  flex-shrink: 0;
 }
 
 .scanner-title-row {
@@ -1067,35 +1072,7 @@ const isTargetReached = computed(() => {
   color: #292541;
 }
 
-/* Stacked Barcode Settings Tray */
-.stacked-barcode-settings {
-  background: #f7f6fd;
-  border-bottom: 1px solid #e7e4f5;
-  padding: 12px 22px;
-  animation: fadeIn 0.2s ease;
-}
-
-.settings-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.setting-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 11px;
-  color: #48445c;
-  cursor: pointer;
-}
-
-.setting-item input[type="checkbox"] {
-  accent-color: #5544b8;
-  cursor: pointer;
-}
-
-/* Multi-scan Counter Bar */
+/* Multi-scan Counter Bar (Pinned under header) */
 .scanner-counter-bar {
   display: flex;
   justify-content: space-between;
@@ -1104,6 +1081,7 @@ const isTargetReached = computed(() => {
   background: #fbfbfe;
   border-bottom: 1px solid #eeecf4;
   font-size: 12px;
+  flex-shrink: 0;
 }
 
 .counter-text {
@@ -1151,24 +1129,88 @@ const isTargetReached = computed(() => {
   background: #fff0f0;
 }
 
+/* Scrollable Modal Body */
+.scanner-modal-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+  scrollbar-width: thin;
+  scrollbar-color: #dedbe8 transparent;
+  display: flex;
+  flex-direction: column;
+}
+
+.scanner-modal-body::-webkit-scrollbar {
+  width: 5px;
+}
+
+.scanner-modal-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scanner-modal-body::-webkit-scrollbar-thumb {
+  background: #dedbe8;
+  border-radius: 4px;
+}
+
+.scanner-modal-body::-webkit-scrollbar-thumb:hover {
+  background: #c2bed1;
+}
+
+/* Stacked Barcode Settings Tray */
+.stacked-barcode-settings {
+  background: #f7f6fd;
+  border-bottom: 1px solid #e7e4f5;
+  padding: 12px 22px;
+  animation: fadeIn 0.2s ease;
+  flex-shrink: 0;
+}
+
+.settings-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.setting-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: #48445c;
+  cursor: pointer;
+}
+
+.setting-item input[type="checkbox"] {
+  accent-color: #5544b8;
+  cursor: pointer;
+}
+
 /* Viewport Area */
 .scanner-viewport-wrapper {
   position: relative;
   background: #0f0e1c;
   width: 100%;
-  min-height: 260px;
+  min-height: 240px;
   max-height: 330px;
   overflow: hidden;
   display: flex;
   justify-content: center;
   align-items: center;
+  flex-shrink: 0;
+  touch-action: pan-y;
 }
 
 .scanner-camera-region {
   width: 100% !important;
   height: 100% !important;
-  min-height: 260px;
+  min-height: 240px;
   background: #0f0e1c;
+  touch-action: pan-y;
 }
 
 :deep(.scanner-camera-region video) {
@@ -1465,6 +1507,7 @@ const isTargetReached = computed(() => {
   padding: 10px 18px;
   background: #fbfaff;
   border-bottom: 1px solid #eeeaf8;
+  flex-shrink: 0;
 }
 
 .candidates-title-row {
@@ -1571,6 +1614,7 @@ const isTargetReached = computed(() => {
   font-size: 11px;
   margin: 10px 20px 0;
   border-radius: 8px;
+  flex-shrink: 0;
 }
 
 .scanner-alert.error {
@@ -1601,8 +1645,7 @@ const isTargetReached = computed(() => {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  max-height: 180px;
-  overflow-y: auto;
+  flex-shrink: 0;
 }
 
 .manual-add-row {
@@ -1654,8 +1697,6 @@ const isTargetReached = computed(() => {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  max-height: 105px;
-  overflow-y: auto;
   padding: 2px 0;
 }
 
@@ -1712,6 +1753,7 @@ const isTargetReached = computed(() => {
   padding: 14px 22px 18px;
   border-top: 1px solid #f0eff3;
   background: #ffffff;
+  flex-shrink: 0;
 }
 
 .file-scan-btn {
@@ -1791,5 +1833,81 @@ const isTargetReached = computed(() => {
 .fade-enter-from,
 .fade-leave-to {
   opacity: 0;
+}
+
+/* Mobile Responsiveness */
+@media (max-width: 640px) {
+  .scanner-modal-backdrop {
+    padding: 8px;
+    align-items: center;
+  }
+
+  .scanner-modal-card {
+    max-height: 96vh;
+    max-height: 96dvh;
+    border-radius: 16px;
+    width: 100%;
+  }
+
+  .scanner-header {
+    padding: 12px 16px;
+  }
+
+  .scanner-title {
+    font-size: 14px;
+  }
+
+  .scanner-subtitle {
+    font-size: 10.5px;
+  }
+
+  .scanner-counter-bar {
+    padding: 8px 16px;
+  }
+
+  .scanner-viewport-wrapper {
+    min-height: 190px;
+    max-height: 230px;
+  }
+
+  .scanner-camera-region {
+    min-height: 190px;
+  }
+
+  .detected-candidates-section {
+    padding: 10px 16px;
+  }
+
+  .candidate-pill-btn {
+    padding: 6px 10px;
+  }
+
+  .cand-val {
+    font-size: 12px;
+  }
+
+  .scanned-items-section {
+    padding: 10px 16px 14px;
+  }
+
+  .scanner-footer {
+    padding: 12px 16px;
+    gap: 8px;
+  }
+
+  .footer-right-actions {
+    gap: 6px;
+  }
+
+  .file-scan-btn {
+    padding: 7px 10px;
+    font-size: 10.5px;
+  }
+
+  .btn-cancel,
+  .btn-confirm {
+    padding: 7px 12px;
+    font-size: 10.5px;
+  }
 }
 </style>

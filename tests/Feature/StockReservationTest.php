@@ -136,4 +136,39 @@ class StockReservationTest extends TestCase
         $this->assertCount(1, $data);
         $this->assertEquals('RSV-002', $data[0]['reservation_number']);
     }
+
+    public function test_can_create_reservation_with_multiple_items(): void
+    {
+        $secondProduct = Product::forceCreate([
+            'id' => (string) Str::ulid(),
+            'company_id' => $this->company->id,
+            'sku' => 'SKU-002',
+            'name' => 'Second Product',
+            'unit_id' => $this->product->unit_id,
+            'has_serial_number' => false,
+            'minimum_stock' => 0,
+        ]);
+
+        $response = $this->postJson('/api/v1/reservations', [
+            'warehouse_id' => $this->warehouse->id,
+            'reservation_date' => '2026-06-01',
+            'remarks' => 'Multi-item reservation',
+            'items' => [
+                [
+                    'product_id' => $this->product->id,
+                    'quantity' => 10,
+                ],
+                [
+                    'product_id' => $secondProduct->id,
+                    'quantity' => 25,
+                ],
+            ],
+        ]);
+
+        $response->assertStatus(201);
+        $reservation = StockReservation::where('remarks', 'Multi-item reservation')->first();
+        $this->assertNotNull($reservation);
+        $this->assertCount(2, $reservation->items);
+        $this->assertEquals(35, $reservation->items->sum('quantity'));
+    }
 }
