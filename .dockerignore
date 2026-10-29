@@ -1,0 +1,13 @@
+.git
+.agents
+.claude
+.codex
+.factory
+.idea
+.vscode
+node_modules
+vendor
+public/build
+storage/*.key
+.env
+.env.*
